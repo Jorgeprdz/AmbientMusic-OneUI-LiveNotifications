@@ -11,7 +11,8 @@ class NowPlayingSurfacePolicyTest {
         notificationsEnabled = true,
         channelBlocked = false,
         hasPromotableCharacteristics = true,
-        canPostPromotedNotifications = true
+        canPostPromotedNotifications = true,
+        postNotificationsGranted = true
     )
 
     @Test
@@ -36,6 +37,29 @@ class NowPlayingSurfacePolicyTest {
         assertFalse(
             NowPlayingSurfacePolicy.EXPERIMENTAL_PROMOTED.shouldRequestPromotion(
                 eligible.copy(channelBlocked = true)
+            )
+        )
+    }
+
+    @Test
+    fun experimentalPromotedRequiresNotificationPermission() {
+        assertFalse(
+            NowPlayingSurfacePolicy.EXPERIMENTAL_PROMOTED.shouldRequestPromotion(
+                eligible.copy(postNotificationsGranted = false)
+            )
+        )
+    }
+
+    @Test
+    fun experimentalPromotedRequiresEnabledNotificationsAndPromotableCharacteristics() {
+        assertFalse(
+            NowPlayingSurfacePolicy.EXPERIMENTAL_PROMOTED.shouldRequestPromotion(
+                eligible.copy(notificationsEnabled = false)
+            )
+        )
+        assertFalse(
+            NowPlayingSurfacePolicy.EXPERIMENTAL_PROMOTED.shouldRequestPromotion(
+                eligible.copy(hasPromotableCharacteristics = false)
             )
         )
     }
