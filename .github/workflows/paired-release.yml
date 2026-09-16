@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: paired-release-${{ github.ref }}
@@ -24,6 +24,28 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          RELEASE_TAG="$(sed -n "s/^def tagName = '\([^']*\)'/\1/p" app/build.gradle | head -n1)"
+          VERSION_CODE="$(sed -n 's/^def version = \([0-9][0-9]*\)/\1/p' app/build.gradle | head -n1)"
+
+          test -n "$RELEASE_TAG"
+          test -n "$VERSION_CODE"
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]
+          test "$VERSION_CODE" -ge 241
+
+          echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+
+          {
+            echo "### Paired release candidate"
+            echo "- Tag: \`$RELEASE_TAG\`"
+            echo "- Android versionCode: \`$VERSION_CODE\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -80,9 +102,6 @@ jobs:
           test -n "$KEY_CERT"
           test "$KEY_CERT" = "$EXPECTED_CERT"
 
-          # This PKCS12 was generated with the same password for the store and
-          # private-key entry. Prove the key can actually be decrypted before
-          # Gradle gets a chance to package/sign anything.
           keytool -certreq \
             -alias "$NOWBAR_KEY_ALIAS" \
             -keystore "$KEYSTORE" \
@@ -176,9 +195,15 @@ jobs:
             | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -n1)"
           PAM_PACKAGE="$($AAPT dump badging pair/PixelAmbientMusic-1.3.5-paired.apk \
             | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -n1)"
+          AMM_VERSION_CODE="$($AAPT dump badging pair/AmbientMusicMod-OneUI.apk \
+            | sed -n "s/^package: .*versionCode='\([^']*\)'.*/\1/p" | head -n1)"
+          AMM_VERSION_NAME="$($AAPT dump badging pair/AmbientMusicMod-OneUI.apk \
+            | sed -n "s/^package: .*versionName='\([^']*\)'.*/\1/p" | head -n1)"
 
           test "$AMM_PACKAGE" = 'com.kieronquinn.app.ambientmusicmod'
           test "$PAM_PACKAGE" = 'com.kieronquinn.app.pixelambientmusic'
+          test "$AMM_VERSION_CODE" = "$VERSION_CODE"
+          test "$AMM_VERSION_NAME" = "$RELEASE_TAG"
 
           rm -f \
             pair/PixelAmbientMusic-1.3.5-official.apk \
@@ -191,6 +216,7 @@ jobs:
             > SHA256SUMS.txt
 
           test "$(wc -l < SHA256SUMS.txt)" -eq 2
+          sha256sum -c SHA256SUMS.txt
 
       - name: Upload verified paired bundle
         uses: actions/upload-artifact@v4
@@ -202,3 +228,82 @@ jobs:
             pair/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish verified GitHub prerelease
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          NOTES="$RUNNER_TEMP/release-notes.md"
+          cat > "$NOTES" <<EOF
+          ## Ambient Music for One UI — $RELEASE_TAG Experimental
+
+          Experimental Samsung One UI derivative of Ambient Music Mod.
+
+          ### Highlights
+          - Recognised songs can surface in Samsung's real Now Bar through Android 16 promoted Live Update notifications.
+          - Promoted Now Bar publishing is always enabled in this experimental derivative.
+          - Includes a paired Pixel Ambient Music 1.3.5 APK signed with the same release identity required by the upstream signature-permission architecture.
+
+          ### Verified device
+          - Samsung Galaxy S25 (SM-S931B), Android 16 / One UI 8.x.
+
+          ### Install
+          Install both APKs from this release together. `SHA256SUMS.txt` contains the public file hashes.
+
+          Unofficial community project. Not affiliated with Samsung, Google, or Kieron Quinn.
+          EOF
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" \
+              pair/AmbientMusicMod-OneUI.apk \
+              pair/PixelAmbientMusic-1.3.5-paired.apk \
+              pair/SHA256SUMS.txt \
+              --clobber
+            gh release edit "$RELEASE_TAG" \
+              --title "$RELEASE_TAG Experimental" \
+              --notes-file "$NOTES" \
+              --prerelease
+          else
+            gh release create "$RELEASE_TAG" \
+              pair/AmbientMusicMod-OneUI.apk \
+              pair/PixelAmbientMusic-1.3.5-paired.apk \
+              pair/SHA256SUMS.txt \
+              --target "$GITHUB_SHA" \
+              --title "$RELEASE_TAG Experimental" \
+              --notes-file "$NOTES" \
+              --prerelease
+          fi
+
+          test "$(gh release view "$RELEASE_TAG" --json tagName --jq '.tagName')" = "$RELEASE_TAG"
+          test "$(gh release view "$RELEASE_TAG" --json isPrerelease --jq '.isPrerelease')" = "true"
+
+          mapfile -t RELEASE_ASSETS < <(
+            gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | sort
+          )
+          EXPECTED_ASSETS=(
+            AmbientMusicMod-OneUI.apk
+            PixelAmbientMusic-1.3.5-paired.apk
+            SHA256SUMS.txt
+          )
+          mapfile -t EXPECTED_SORTED < <(printf '%s\n' "${EXPECTED_ASSETS[@]}" | sort)
+
+          test "${#RELEASE_ASSETS[@]}" -eq 3
+          test "$(printf '%s\n' "${RELEASE_ASSETS[@]}")" = \
+               "$(printf '%s\n' "${EXPECTED_SORTED[@]}")"
+
+          {
+            echo "### Public prerelease"
+            echo "- https://github.com/${GITHUB_REPOSITORY}/releases/tag/$RELEASE_TAG"
+            echo "- Assets: verified paired APKs + SHA256SUMS.txt"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Note non-main release behavior
+        if: github.ref != 'refs/heads/main'
+        shell: bash
+        run: |
+          echo "Verified bundle built successfully. Public GitHub Release publication is restricted to main." \
+            >> "$GITHUB_STEP_SUMMARY"
