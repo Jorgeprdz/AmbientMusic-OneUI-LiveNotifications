@@ -7,6 +7,7 @@ import com.kieronquinn.app.pixelambientmusic.model.RecognitionMetadata
 import com.kieronquinn.app.pixelambientmusic.model.RecognitionResult
 import com.kieronquinn.app.pixelambientmusic.model.RecognitionSource
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NowPlayingSurfaceLifecycleTest {
@@ -67,6 +68,28 @@ class NowPlayingSurfaceLifecycleTest {
         lifecycle.onRecognitionState(RecognitionState.Error(RecognitionState.ErrorReason.DISABLED))
 
         assertEquals(1, publisher.clearCount)
+    }
+
+    @Test
+    fun recordingDoesNotClearOrReplacePublishedSurface() {
+        val publisher = RecordingPublisher()
+        val lifecycle = NowPlayingSurfaceLifecycle(publisher)
+
+        lifecycle.onRecognitionState(RecognitionState.Recording(RecognitionSource.NNFP))
+
+        assertEquals(0, publisher.clearCount)
+        assertTrue(publisher.events.isEmpty())
+    }
+
+    @Test
+    fun recognisingDoesNotClearOrReplacePublishedSurface() {
+        val publisher = RecordingPublisher()
+        val lifecycle = NowPlayingSurfaceLifecycle(publisher)
+
+        lifecycle.onRecognitionState(RecognitionState.Recognising(RecognitionSource.NNFP))
+
+        assertEquals(0, publisher.clearCount)
+        assertTrue(publisher.events.isEmpty())
     }
 
     private class RecordingPublisher: NowPlayingSurfacePublisher {
