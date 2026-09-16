@@ -20,6 +20,9 @@ import com.kieronquinn.app.ambientmusicmod.R
 import com.kieronquinn.app.ambientmusicmod.components.notifications.NotificationChannel
 import com.kieronquinn.app.ambientmusicmod.components.notifications.NotificationId
 import com.kieronquinn.app.ambientmusicmod.components.notifications.createNotification
+import com.kieronquinn.app.ambientmusicmod.components.nowplayingsurface.AndroidLiveUpdateNowPlayingSurfacePublisher
+import com.kieronquinn.app.ambientmusicmod.components.nowplayingsurface.NowPlayingSurfaceLifecycle
+import com.kieronquinn.app.ambientmusicmod.components.nowplayingsurface.NowPlayingSurfacePolicy
 import com.kieronquinn.app.ambientmusicmod.model.lockscreenoverlay.OverlayState
 import com.kieronquinn.app.ambientmusicmod.model.lockscreenoverlay.stateEquals
 import com.kieronquinn.app.ambientmusicmod.model.recognition.Player
@@ -85,6 +88,17 @@ class AmbientMusicModForegroundService: LifecycleService() {
     private val shizuku by inject<ShizukuServiceRepository>()
     private val widgetRepository by inject<WidgetRepository>()
     private var overlayTimeoutJob: Job? = null
+
+    private val nowPlayingSurfacePublisher by lazy {
+        AndroidLiveUpdateNowPlayingSurfacePublisher(
+            this,
+            NowPlayingSurfacePolicy.EXPERIMENTAL_PROMOTED
+        )
+    }
+
+    private val nowPlayingSurfaceLifecycle by lazy {
+        NowPlayingSurfaceLifecycle(nowPlayingSurfacePublisher)
+    }
 
     private val notificationManager by lazy {
         getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -348,6 +362,7 @@ class AmbientMusicModForegroundService: LifecycleService() {
         setupToggle()
         setupBedtime()
         setupWidget()
+        setupNowPlayingSurface()
         setupOwnerInfo()
         setupErrorNotification()
         setupErrorNotificationRetry()
@@ -361,6 +376,7 @@ class AmbientMusicModForegroundService: LifecycleService() {
 
     override fun onDestroy() {
         MESSAGE_HANDLER = null
+        nowPlayingSurfacePublisher.clear()
         super.onDestroy()
     }
 
@@ -444,6 +460,12 @@ class AmbientMusicModForegroundService: LifecycleService() {
     private fun setupWidget() = whenCreated {
         recognitionState.collect {
             widgetRepository.notifyRecognitionState(it)
+        }
+    }
+
+    private fun setupNowPlayingSurface() = whenCreated {
+        recognitionState.filterNotNull().collect { state ->
+            nowPlayingSurfaceLifecycle.onRecognitionState(state)
         }
     }
 
