@@ -29,9 +29,11 @@ fun GitHubRelease.toRelease(
         it.contentType == CONTENT_TYPE_APK ||
             it.fileName?.endsWith(".apk", ignoreCase = true) == true
     }.orEmpty()
-    val asset = preferredFileName?.let { preferred ->
-        apkAssets.firstOrNull { it.fileName == preferred }
-    } ?: apkAssets.firstOrNull() ?: return null
+    val asset = if (preferredFileName != null) {
+        apkAssets.firstOrNull { it.fileName == preferredFileName } ?: return null
+    } else {
+        apkAssets.firstOrNull() ?: return null
+    }
     val downloadUrl = asset.downloadUrl ?: return null
     val fileName = asset.fileName ?: return null
     val gitHubUrl = gitHubUrl ?: return null
