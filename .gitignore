@@ -272,3 +272,6 @@ hs_err_pid*
 # End of https://www.toptal.com/developers/gitignore/api/android,androidstudio,intellij
 
 .DS_Store
+*.p12
+
+*RECOVERY*PRIVATE*

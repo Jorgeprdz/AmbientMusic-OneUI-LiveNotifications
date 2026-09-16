@@ -15,7 +15,9 @@ This project is not affiliated with or endorsed by Samsung, Google, or Kieron Qu
 
 The integration has been physically validated on a Samsung Galaxy S25 (`SM-S931B`) running Android 16 / One UI 8.x. During validation, Ambient Music Mod recognised **Dream On — Aerosmith** and Samsung SystemUI rendered the title and artist in the real lock-screen Now Bar, including the platform's progress treatment.
 
-A sanitized real-device screenshot will be kept in `docs/assets/` as release evidence; compatibility claims remain limited to devices explicitly listed below.
+![Ambient Music for One UI showing Dream On by Aerosmith in Samsung Now Bar](docs/assets/nowbar-s25-dream-on.jpg)
+
+The image above is a cropped, metadata-stripped capture from the validated physical device. Unrelated personal notification content was removed by cropping only.
 
 ## What it does
 
