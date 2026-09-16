@@ -4,7 +4,8 @@ data class NowPlayingSurfaceCapabilities(
     val notificationsEnabled: Boolean,
     val channelBlocked: Boolean,
     val hasPromotableCharacteristics: Boolean,
-    val canPostPromotedNotifications: Boolean
+    val canPostPromotedNotifications: Boolean,
+    val postNotificationsGranted: Boolean = true
 )
 
 enum class NowPlayingSurfacePolicy {
@@ -13,6 +14,7 @@ enum class NowPlayingSurfacePolicy {
 
     fun shouldRequestPromotion(capabilities: NowPlayingSurfaceCapabilities): Boolean {
         return this == EXPERIMENTAL_PROMOTED &&
+            capabilities.postNotificationsGranted &&
             capabilities.notificationsEnabled &&
             !capabilities.channelBlocked &&
             capabilities.hasPromotableCharacteristics &&
