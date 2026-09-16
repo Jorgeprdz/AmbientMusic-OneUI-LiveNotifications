@@ -52,11 +52,16 @@ jobs:
           grep -q "android.permission.POST_PROMOTED_NOTIFICATIONS" app/src/debug/AndroidManifest.xml
           grep -q "setRequestPromotedOngoing(true)" app/src/debug/java/com/kieronquinn/app/ambientmusicmod/debug/NowPlayingSurfaceProbe.kt
           grep -q "FLAG_PROMOTED_ONGOING" app/src/debug/java/com/kieronquinn/app/ambientmusicmod/debug/NowPlayingSurfaceProbe.kt
-          if grep -R -E "NotificationListenerService|MediaSession|KeepAliveForegroundService|WakeLock|AlarmManager|WorkManager" \
-            app/src/debug/java/com/kieronquinn/app/ambientmusicmod/debug/NowPlayingSurfaceProbe*.kt; then
+
+          matches="$(grep -R -n -E "NotificationListenerService|MediaSession|KeepAliveForegroundService|WakeLock|AlarmManager|WorkManager" \
+            app/src/debug/java/com/kieronquinn/app/ambientmusicmod/debug/NowPlayingSurfaceProbe*.kt || true)"
+          code_matches="$(printf '%s\n' "$matches" | grep -Ev ':[[:space:]]*(//|/\*|\*)' || true)"
+          if [ -n "$code_matches" ]; then
+            printf '%s\n' "$code_matches"
             echo "Forbidden M0 mechanism found"
             exit 1
           fi
+
           if grep -q "<service" app/src/debug/AndroidManifest.xml; then
             echo "M0 must not add a service"
             exit 1
