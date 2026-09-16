@@ -3,6 +3,7 @@
 > Now Playing recognition in Samsung's Now Bar using Android Live Updates.
 
 [![CI](https://github.com/Jorgeprdz/AmbientMusic-OneUI-LiveNotifications/actions/workflows/ci.yml/badge.svg)](https://github.com/Jorgeprdz/AmbientMusic-OneUI-LiveNotifications/actions/workflows/ci.yml)
+[![Upstream Sync](https://github.com/Jorgeprdz/AmbientMusic-OneUI-LiveNotifications/actions/workflows/upstream-sync.yml/badge.svg)](https://github.com/Jorgeprdz/AmbientMusic-OneUI-LiveNotifications/actions/workflows/upstream-sync.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 **Experimental · Unofficial community project**
@@ -49,16 +50,34 @@ See [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) for the testing policy.
 
 ## Installation
 
-Public releases distribute a paired set of APKs:
+Public releases distribute a paired set of APKs plus checksums:
 
 - `AmbientMusicMod-OneUI.apk`
 - `PixelAmbientMusic-1.3.5-paired.apk`
+- `SHA256SUMS.txt`
 
 Install **Pixel Ambient Music first**, then **Ambient Music for One UI**. Both APKs must be signed by the same project certificate because communication between the two components is protected by signature-level permissions.
 
 If you are migrating from upstream-signed Ambient Music Mod / Now Playing builds, back up your Ambient Music Mod data first. Android will not accept an in-place update when the signing certificate changes, so uninstalling the previous pair may be required.
 
+Builds created before the first public derivative release do not yet know this repository's self-update endpoint. Install `v0.1.0` once from this repository's Releases page; builds from `v0.1.0` onward check this repository for future application updates.
+
 Full instructions: [docs/INSTALLATION.md](docs/INSTALLATION.md).
+
+## Updates and upstream maintenance
+
+The app deliberately keeps two GitHub update sources separate:
+
+- **Ambient Music for One UI:** `Jorgeprdz/AmbientMusic-OneUI-LiveNotifications`
+- **Pixel Ambient Music:** `KieronQuinn/NowPlaying`
+
+The AMM updater selects `AmbientMusicMod-OneUI.apk` explicitly from paired releases, so the presence of the PAM APK in the same release cannot redirect the application update to the wrong package.
+
+This repository also monitors `KieronQuinn/AmbientMusicMod@main` automatically. The scheduled **Upstream Sync** Action performs a real Git merge candidate and runs unit tests, instrumentation-test compilation and release compilation before any compatible upstream change can reach `main`.
+
+Conflicts or regressions fail closed: `main` is left unchanged and a single **Upstream sync blocked** issue is created or updated for investigation. The sync job uses an ephemeral CI key and never accesses public-release signing secrets.
+
+Full provenance and synchronization details: [docs/UPSTREAM.md](docs/UPSTREAM.md).
 
 ## How it works
 
@@ -99,18 +118,24 @@ Because Pixel Ambient Music and Ambient Music Mod use signature-protected commun
 
 CI uses a disposable key for compile/test validation only. Public release artifacts use the stable release signer provided to GitHub Actions through encrypted repository secrets.
 
-## Paired signing
+## Paired signing and public releases
 
-The paired-signing workflow verifies all of the following before producing release-ready artifacts:
+The paired-release workflow verifies all of the following before publishing a prerelease:
 
-1. the pinned Pixel Ambient Music package is the expected upstream binary;
-2. both APK package IDs are correct;
-3. both APKs verify successfully with `apksigner`;
-4. both APKs have the same certificate SHA-256 digest;
-5. that digest matches the configured stable release certificate;
-6. SHA-256 checksums are generated for the public assets.
+1. unit tests pass;
+2. instrumentation tests compile;
+3. the AMM release APK builds successfully;
+4. the pinned Pixel Ambient Music package is the expected upstream binary;
+5. both APK package IDs are correct;
+6. both APKs verify successfully with `apksigner`;
+7. both APKs have the same certificate SHA-256 digest;
+8. that digest matches the configured stable release certificate;
+9. the AMM APK version matches the release tag/versionCode from source;
+10. SHA-256 checksums are generated and verified for the public assets.
 
-No keystore, signing password, recovery file or `local.properties` containing secrets is committed to the repository.
+Only after those gates pass can the workflow create or update the matching GitHub prerelease and attach the two APKs plus `SHA256SUMS.txt`.
+
+No keystore, signing password, recovery file or `local.properties` containing secrets is committed or attached to a public release.
 
 ## Credits & Acknowledgements
 
@@ -121,7 +146,7 @@ This project exists because of substantial upstream work. Credit belongs clearly
 - **[KieronQuinn/NowPlaying](https://github.com/KieronQuinn/NowPlaying)** — Pixel Ambient Music / Now Playing component used by Ambient Music Mod.
 - **Google / Android Open Source Project** — Android platform APIs used by this project, including notification and Live Update capabilities. No endorsement or affiliation is implied.
 - **Samsung** — One UI and Now Bar are the target presentation environment. No endorsement or affiliation is implied.
-- **Jorge Palacios (`Jorgeprdz`)** — One UI Live Update / Now Bar integration, paired-signing workflow, Samsung Galaxy S25 physical validation, derivative packaging, documentation and maintenance.
+- **Jorge Palacios (`Jorgeprdz`)** — One UI Live Update / Now Bar integration, paired-signing and release workflow, automatic upstream compatibility sync, Samsung Galaxy S25 physical validation, derivative packaging, documentation and maintenance.
 
 The recognition engine and original Ambient Music Mod application are upstream work and are not claimed as original work of this derivative. See [docs/UPSTREAM.md](docs/UPSTREAM.md) for provenance details.
 

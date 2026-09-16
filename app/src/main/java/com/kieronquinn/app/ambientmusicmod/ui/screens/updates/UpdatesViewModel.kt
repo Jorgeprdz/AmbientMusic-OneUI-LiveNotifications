@@ -118,10 +118,12 @@ class UpdatesViewModelImpl(
 
     companion object {
         private const val LINK_TWITTER = "https://kieronquinn.co.uk/redirect/AmbientMusicMod/twitter"
-        private const val LINK_GITHUB = "https://kieronquinn.co.uk/redirect/AmbientMusicMod/github"
+        internal const val LINK_GITHUB =
+            "https://github.com/Jorgeprdz/AmbientMusic-OneUI-LiveNotifications"
         private const val LINK_XDA = "https://kieronquinn.co.uk/redirect/AmbientMusicMod/xda"
         private const val LINK_DONATE = "https://kieronquinn.co.uk/redirect/AmbientMusicMod/donate"
         private const val MIN_MULTIPLE_COUNTRIES_VERSION_CODE = 120L
+        internal const val AMM_RELEASE_ASSET = "AmbientMusicMod-OneUI.apk"
     }
 
     private val reloadBus = MutableStateFlow(Pair(System.currentTimeMillis(), false))
@@ -210,7 +212,7 @@ class UpdatesViewModelImpl(
     }
 
     override fun onAMMUpdateClicked(label: String, updateState: UpdateState) {
-        val release = updateState.toRelease(label) ?: return
+        val release = updateState.toRelease(label, AMM_RELEASE_ASSET) ?: return
         viewModelScope.launch {
             navigation.navigate(UpdatesFragmentDirections.actionUpdatesFragmentToUpdatesDownloadFragment(release))
         }
@@ -223,13 +225,16 @@ class UpdatesViewModelImpl(
         }
     }
 
-    private fun UpdateState.toRelease(label: String): Release? {
+    private fun UpdateState.toRelease(
+        label: String,
+        preferredFileName: String? = null
+    ): Release? {
         return when(this){
             is UpdateState.UpdateAvailable -> Pair(localVersion, release)
             is UpdateState.NotInstalled -> Pair("", release)
             else -> null
         }?.let {
-            it.second.toRelease(label, it.first)
+            it.second.toRelease(label, it.first, preferredFileName)
         }
     }
 

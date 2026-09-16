@@ -28,6 +28,7 @@ class AndroidLiveUpdateNowPlayingSurfacePublisher(
     companion object {
         const val CHANNEL_ID = "now_playing_surface_v1"
         const val NOTIFICATION_ID = 0x4E50
+        private const val SURFACE_APP_NAME = "Ambient Music for One UI"
     }
 
     private val context = context.applicationContext
@@ -43,7 +44,7 @@ class AndroidLiveUpdateNowPlayingSurfacePublisher(
                 "Now Playing live update",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Recognised music from Ambient Music Mod"
+                description = "Recognised music from $SURFACE_APP_NAME"
                 setSound(null, null)
                 enableVibration(false)
                 enableLights(false)
@@ -69,7 +70,7 @@ class AndroidLiveUpdateNowPlayingSurfacePublisher(
             .setSmallIcon(R.drawable.ic_fab_recognise)
             .setContentTitle(event.title)
             .setContentText(event.artist)
-            .setSubText("Ambient Music Mod")
+            .setSubText(SURFACE_APP_NAME)
             .setContentIntent(contentIntent)
             .setCategory(Notification.CATEGORY_STATUS)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)

@@ -1,0 +1,282 @@
+name: Upstream Sync
+
+on:
+  schedule:
+    - cron: '17 8 * * *'
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/upstream-sync.yml
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+          log-accepted-android-sdk-licenses: false
+
+      - name: Install Android API 36
+        shell: bash
+        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;35.0.0"
+
+      - name: Create ephemeral CI signing key
+        shell: bash
+        run: |
+          set -euo pipefail
+          KEYSTORE="$RUNNER_TEMP/upstream-sync-ci.p12"
+          keytool -genkeypair \
+            -alias ci \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 2 \
+            -storetype PKCS12 \
+            -keystore "$KEYSTORE" \
+            -storepass ci-only-password \
+            -keypass ci-only-password \
+            -dname "CN=Upstream Sync CI, O=Ambient Music for One UI" \
+            -noprompt
+
+          cat > local.properties <<EOF
+          storeFile=$KEYSTORE
+          storePassword=ci-only-password
+          keyAlias=ci
+          keyPassword=ci-only-password
+          EOF
+
+      - name: Merge and validate upstream candidate
+        id: sync
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          write_output() {
+            local status="$1"
+            local reason="$2"
+            local details="${3:-}"
+            {
+              echo "status=$status"
+              echo "reason=$reason"
+              echo "base_sha=$BASE_SHA"
+              echo "upstream_sha=${UPSTREAM_SHA:-unknown}"
+              echo "candidate_sha=${CANDIDATE_SHA:-unknown}"
+              echo "details<<EOF"
+              printf '%s\n' "$details"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          }
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          BASE_SHA="$(git rev-parse HEAD)"
+          UPSTREAM_SHA=""
+          CANDIDATE_SHA=""
+
+          git remote remove upstream 2>/dev/null || true
+          git remote add upstream https://github.com/KieronQuinn/AmbientMusicMod.git
+
+          if ! git fetch --no-tags upstream main; then
+            write_output blocked upstream_fetch_failed "Unable to fetch KieronQuinn/AmbientMusicMod@main."
+            exit 0
+          fi
+
+          UPSTREAM_SHA="$(git rev-parse upstream/main)"
+          SHORT_SHA="${UPSTREAM_SHA:0:12}"
+
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            write_output no_updates already_contained "upstream/main is already contained in this repository's main history."
+            exit 0
+          fi
+
+          SYNC_BRANCH="automation/upstream-sync-$SHORT_SHA"
+          git switch -c "$SYNC_BRANCH"
+
+          MERGE_OUTPUT="$RUNNER_TEMP/upstream-merge.txt"
+          if ! git merge --no-ff --no-commit upstream/main >"$MERGE_OUTPUT" 2>&1; then
+            CONFLICTS="$(git diff --name-only --diff-filter=U || true)"
+            git merge --abort || true
+            write_output blocked merge_conflict "${CONFLICTS:-Merge failed before conflict files could be enumerated.}"
+            exit 0
+          fi
+
+          git commit -m "Merge upstream KieronQuinn/AmbientMusicMod@$SHORT_SHA"
+          CANDIDATE_SHA="$(git rev-parse HEAD)"
+
+          # A candidate can compile and still silently remove derivative-specific
+          # behavior. Guard the public contract before spending time on Gradle.
+          GUARD_FAILURES=()
+          check_guard() {
+            local file="$1"
+            local needle="$2"
+            if [ ! -f "$file" ] || ! grep -Fq "$needle" "$file"; then
+              GUARD_FAILURES+=("$file :: $needle")
+            fi
+          }
+
+          check_guard \
+            app/src/main/java/com/kieronquinn/app/ambientmusicmod/service/AmbientMusicModForegroundService.kt \
+            'NowPlayingSurfacePolicy.EXPERIMENTAL_PROMOTED'
+          check_guard \
+            app/src/main/java/com/kieronquinn/app/ambientmusicmod/components/nowplayingsurface/AndroidLiveUpdateNowPlayingSurfacePublisher.kt \
+            'setRequestPromotedOngoing'
+          check_guard \
+            app/src/main/AndroidManifest.xml \
+            'android.permission.POST_PROMOTED_NOTIFICATIONS'
+          check_guard \
+            app/src/main/java/com/kieronquinn/app/ambientmusicmod/repositories/UpdatesRepository.kt \
+            'AMM_GITHUB_OWNER = "Jorgeprdz"'
+          check_guard \
+            app/src/main/java/com/kieronquinn/app/ambientmusicmod/repositories/UpdatesRepository.kt \
+            'PAM_GITHUB_REPOSITORY = "NowPlaying"'
+          check_guard \
+            app/src/main/java/com/kieronquinn/app/ambientmusicmod/ui/screens/updates/UpdatesViewModel.kt \
+            'AMM_RELEASE_ASSET = "AmbientMusicMod-OneUI.apk"'
+          check_guard \
+            app/src/release/AndroidManifest.xml \
+            'android:label="Ambient Music for One UI"'
+
+          SOURCE_TAG="$(sed -n "s/^def tagName = '\([^']*\)'/\1/p" app/build.gradle | head -n1)"
+          RELEASE_TRIGGER="$(tr -d '[:space:]' < .github/release-trigger 2>/dev/null || true)"
+          if [ -z "$SOURCE_TAG" ] || [ "$SOURCE_TAG" != "$RELEASE_TRIGGER" ]; then
+            GUARD_FAILURES+=("release identity mismatch :: source=$SOURCE_TAG marker=$RELEASE_TRIGGER")
+          fi
+
+          if [ "${#GUARD_FAILURES[@]}" -ne 0 ]; then
+            GUARD_DETAILS="$(printf '%s\n' "${GUARD_FAILURES[@]}")"
+            write_output blocked derivative_guard_failed "$GUARD_DETAILS"
+            exit 0
+          fi
+
+          chmod +x ./gradlew
+
+          if ! ./gradlew :app:testDebugUnitTest --stacktrace; then
+            write_output blocked unit_tests_failed "Candidate merge failed :app:testDebugUnitTest."
+            exit 0
+          fi
+
+          if ! ./gradlew :app:assembleDebugAndroidTest --stacktrace; then
+            write_output blocked instrumentation_compile_failed "Candidate merge failed :app:assembleDebugAndroidTest."
+            exit 0
+          fi
+
+          if ! ./gradlew :app:compileReleaseKotlin --stacktrace; then
+            write_output blocked release_compile_failed "Candidate merge failed :app:compileReleaseKotlin."
+            exit 0
+          fi
+
+          if ! git fetch origin main; then
+            write_output blocked origin_refresh_failed "Unable to refresh origin/main before the final race check."
+            exit 0
+          fi
+
+          CURRENT_MAIN="$(git rev-parse origin/main)"
+          if [ "$CURRENT_MAIN" != "$BASE_SHA" ]; then
+            write_output blocked main_moved "origin/main moved from $BASE_SHA to $CURRENT_MAIN while the candidate was validating."
+            exit 0
+          fi
+
+          if ! git push origin HEAD:main; then
+            write_output blocked push_rejected "Validated candidate could not be pushed to main with a normal non-force push."
+            exit 0
+          fi
+
+          write_output merged validated_and_pushed "Validated upstream merge $CANDIDATE_SHA was pushed to main."
+
+      - name: Update upstream sync tracking issue
+        if: always() && steps.sync.outputs.status != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STATUS: ${{ steps.sync.outputs.status }}
+          REASON: ${{ steps.sync.outputs.reason }}
+          BASE_SHA: ${{ steps.sync.outputs.base_sha }}
+          UPSTREAM_SHA: ${{ steps.sync.outputs.upstream_sha }}
+          CANDIDATE_SHA: ${{ steps.sync.outputs.candidate_sha }}
+          DETAILS: ${{ steps.sync.outputs.details }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TITLE="Upstream sync blocked"
+          ISSUE_NUMBER="$(
+            gh issue list \
+              --state open \
+              --limit 100 \
+              --json number,title \
+              --jq '.[] | select(.title == "Upstream sync blocked") | .number' \
+              | head -n1
+          )"
+
+          if [ "$STATUS" = "blocked" ]; then
+            BODY="$RUNNER_TEMP/upstream-sync-issue.md"
+            cat > "$BODY" <<EOF
+          Automated synchronization with \`KieronQuinn/AmbientMusicMod@main\` is blocked.
+
+          - **Upstream SHA:** \`$UPSTREAM_SHA\`
+          - **Local base SHA:** \`$BASE_SHA\`
+          - **Candidate SHA:** \`$CANDIDATE_SHA\`
+          - **Reason:** \`$REASON\`
+          - **Workflow:** $WORKFLOW_URL
+
+          ### Details
+
+          \`\`\`
+          $DETAILS
+          \`\`\`
+
+          \`main\` was left unchanged. The automation never force-pushes or auto-resolves failed compatibility checks.
+          EOF
+
+            if [ -n "$ISSUE_NUMBER" ]; then
+              gh issue edit "$ISSUE_NUMBER" --body-file "$BODY"
+            else
+              gh issue create --title "$TITLE" --body-file "$BODY"
+            fi
+          elif [ -n "$ISSUE_NUMBER" ]; then
+            gh issue close "$ISSUE_NUMBER" \
+              --comment "Resolved by upstream-sync run: $WORKFLOW_URL (status: $STATUS)."
+          fi
+
+          {
+            echo "### Upstream Sync"
+            echo "- Status: \`$STATUS\`"
+            echo "- Reason: \`$REASON\`"
+            echo "- Upstream: \`$UPSTREAM_SHA\`"
+            echo "- Base: \`$BASE_SHA\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail closed when upstream cannot be integrated
+        if: steps.sync.outputs.status == 'blocked'
+        shell: bash
+        run: |
+          echo "Upstream sync is blocked; main was not modified."
+          exit 1

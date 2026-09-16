@@ -2,10 +2,11 @@
 
 ## Release pair
 
-A working public release consists of two APKs signed with the same project certificate:
+A working public release consists of two APKs signed with the same project certificate plus a checksum file:
 
 - `PixelAmbientMusic-1.3.5-paired.apk`
 - `AmbientMusicMod-OneUI.apk`
+- `SHA256SUMS.txt`
 
 Package IDs:
 
@@ -14,11 +15,25 @@ PAM: com.kieronquinn.app.pixelambientmusic
 AMM: com.kieronquinn.app.ambientmusicmod
 ```
 
+The first public derivative release is `v0.1.0 Experimental` with AMM `versionCode 241`.
+
 ## Before migrating
 
 If Ambient Music Mod is already installed, create an application backup before uninstalling anything. A signing-certificate change prevents Android from accepting an in-place update from an upstream-signed installation to this derivative pair.
 
 If the previous AMM/PAM installation uses a different signer, both packages may need to be uninstalled before the derivative pair can be installed.
+
+If you already installed one of the pre-release paired derivative builds from this project, `v0.1.0` uses the same stable project signer and a higher AMM versionCode, so the AMM APK is intended to update that derivative in place.
+
+## Verify downloads
+
+Keep the three release files in one directory and run:
+
+```bash
+sha256sum -c SHA256SUMS.txt
+```
+
+Both APK entries should report `OK` before installation.
 
 ## Install order
 
@@ -64,6 +79,12 @@ adb install PixelAmbientMusic-1.3.5-paired.apk
 adb install AmbientMusicMod-OneUI.apk
 ```
 
+For an existing installation already signed with this derivative's stable signer, use normal package replacement for a newer versionCode:
+
+```bash
+adb install -r AmbientMusicMod-OneUI.apk
+```
+
 Do not use `-r` to force a signature-incompatible update. If Android reports a signing conflict, back up application data, uninstall the conflicting pair, then perform a clean install.
 
 ## Restoring an Ambient Music Mod backup
@@ -72,4 +93,8 @@ Use Ambient Music Mod's built-in Backup & Restore flow after the derivative inst
 
 ## Updating later releases
 
-Once a device is on this project's stable paired signer, future project releases signed with that same certificate can update in place, subject to normal Android package/version rules.
+`v0.1.0` is the bootstrap release for this repository's self-update path. Builds created before `v0.1.0` still use the upstream Ambient Music Mod update endpoint, so install `v0.1.0` manually once from this repository.
+
+From `v0.1.0` onward, **Check for updates** uses `Jorgeprdz/AmbientMusic-OneUI-LiveNotifications` for AMM updates while PAM continues to use `KieronQuinn/NowPlaying`.
+
+The AMM updater selects `AmbientMusicMod-OneUI.apk` explicitly from paired releases. Future project releases signed with the same certificate and a higher versionCode can update in place, subject to normal Android package rules.

@@ -18,12 +18,34 @@ data class Release(
 
 private const val CONTENT_TYPE_APK = "application/vnd.android.package-archive"
 
-fun GitHubRelease.toRelease(title: String, localVersion: String?): Release? {
-    val versionName = versionName ?: return null
-    val asset = assets?.firstOrNull { it.contentType == CONTENT_TYPE_APK } ?: return null
+fun GitHubRelease.toRelease(
+    title: String,
+    localVersion: String?,
+    preferredFileName: String? = null
+): Release? {
+    val releaseTag = tag ?: return null
+    val releaseVersionName = versionName ?: return null
+    val apkAssets = assets?.filter {
+        it.contentType == CONTENT_TYPE_APK ||
+            it.fileName?.endsWith(".apk", ignoreCase = true) == true
+    }.orEmpty()
+    val asset = if (preferredFileName != null) {
+        apkAssets.firstOrNull { it.fileName == preferredFileName } ?: return null
+    } else {
+        apkAssets.firstOrNull() ?: return null
+    }
     val downloadUrl = asset.downloadUrl ?: return null
     val fileName = asset.fileName ?: return null
     val gitHubUrl = gitHubUrl ?: return null
     val body = body ?: return null
-    return Release(title, tag!!, versionName, localVersion, downloadUrl, fileName, gitHubUrl, body)
+    return Release(
+        title,
+        releaseTag,
+        releaseVersionName,
+        localVersion,
+        downloadUrl,
+        fileName,
+        gitHubUrl,
+        body
+    )
 }
