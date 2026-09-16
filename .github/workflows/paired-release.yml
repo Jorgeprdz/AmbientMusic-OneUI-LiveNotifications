@@ -238,9 +238,9 @@ jobs:
           set -euo pipefail
 
           NOTES="$RUNNER_TEMP/release-notes.md"
-          cat > "$NOTES" <<EOF
-          ## Ambient Music for One UI — $RELEASE_TAG Experimental
-
+          {
+            printf '## Ambient Music for One UI — %s Experimental\n\n' "$RELEASE_TAG"
+            cat <<'EOF'
           Experimental Samsung One UI derivative of Ambient Music Mod.
 
           ### Highlights
@@ -256,6 +256,7 @@ jobs:
 
           Unofficial community project. Not affiliated with Samsung, Google, or Kieron Quinn.
           EOF
+          } > "$NOTES"
 
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release upload "$RELEASE_TAG" \
