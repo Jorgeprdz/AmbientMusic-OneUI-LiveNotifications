@@ -67,6 +67,26 @@ jobs:
             exit 1
           fi
 
+      - name: Create CI signing key
+        shell: bash
+        run: |
+          set -euo pipefail
+          keytool -genkeypair \
+            -keystore "$RUNNER_TEMP/m0-ci.jks" \
+            -storepass m0-ci-password \
+            -keypass m0-ci-password \
+            -alias m0-ci \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 2 \
+            -dname "CN=AmbientMusicMod M0 CI, OU=M0, O=Local Test, C=MX"
+          cat > local.properties <<EOF
+          storeFile=$RUNNER_TEMP/m0-ci.jks
+          storePassword=m0-ci-password
+          keyAlias=m0-ci
+          keyPassword=m0-ci-password
+          EOF
+
       - name: Build M0 APK and test APK
         shell: bash
         run: |
