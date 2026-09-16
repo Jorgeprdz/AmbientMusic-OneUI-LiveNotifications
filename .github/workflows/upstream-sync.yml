@@ -131,6 +131,51 @@ jobs:
           git commit -m "Merge upstream KieronQuinn/AmbientMusicMod@$SHORT_SHA"
           CANDIDATE_SHA="$(git rev-parse HEAD)"
 
+          # A candidate can compile and still silently remove derivative-specific
+          # behavior. Guard the public contract before spending time on Gradle.
+          GUARD_FAILURES=()
+          check_guard() {
+            local file="$1"
+            local needle="$2"
+            if [ ! -f "$file" ] || ! grep -Fq "$needle" "$file"; then
+              GUARD_FAILURES+=("$file :: $needle")
+            fi
+          }
+
+          check_guard \
+            app/src/main/java/com/kieronquinn/app/ambientmusicmod/service/AmbientMusicModForegroundService.kt \
+            'NowPlayingSurfacePolicy.EXPERIMENTAL_PROMOTED'
+          check_guard \
+            app/src/main/java/com/kieronquinn/app/ambientmusicmod/components/nowplayingsurface/AndroidLiveUpdateNowPlayingSurfacePublisher.kt \
+            'setRequestPromotedOngoing'
+          check_guard \
+            app/src/main/AndroidManifest.xml \
+            'android.permission.POST_PROMOTED_NOTIFICATIONS'
+          check_guard \
+            app/src/main/java/com/kieronquinn/app/ambientmusicmod/repositories/UpdatesRepository.kt \
+            'AMM_GITHUB_OWNER = "Jorgeprdz"'
+          check_guard \
+            app/src/main/java/com/kieronquinn/app/ambientmusicmod/repositories/UpdatesRepository.kt \
+            'PAM_GITHUB_REPOSITORY = "NowPlaying"'
+          check_guard \
+            app/src/main/java/com/kieronquinn/app/ambientmusicmod/ui/screens/updates/UpdatesViewModel.kt \
+            'AMM_RELEASE_ASSET = "AmbientMusicMod-OneUI.apk"'
+          check_guard \
+            app/src/release/AndroidManifest.xml \
+            'android:label="Ambient Music for One UI"'
+
+          SOURCE_TAG="$(sed -n "s/^def tagName = '\([^']*\)'/\1/p" app/build.gradle | head -n1)"
+          RELEASE_TRIGGER="$(tr -d '[:space:]' < .github/release-trigger 2>/dev/null || true)"
+          if [ -z "$SOURCE_TAG" ] || [ "$SOURCE_TAG" != "$RELEASE_TRIGGER" ]; then
+            GUARD_FAILURES+=("release identity mismatch :: source=$SOURCE_TAG marker=$RELEASE_TRIGGER")
+          fi
+
+          if [ "${#GUARD_FAILURES[@]}" -ne 0 ]; then
+            GUARD_DETAILS="$(printf '%s\n' "${GUARD_FAILURES[@]}")"
+            write_output blocked derivative_guard_failed "$GUARD_DETAILS"
+            exit 0
+          fi
+
           chmod +x ./gradlew
 
           if ! ./gradlew :app:testDebugUnitTest --stacktrace; then
