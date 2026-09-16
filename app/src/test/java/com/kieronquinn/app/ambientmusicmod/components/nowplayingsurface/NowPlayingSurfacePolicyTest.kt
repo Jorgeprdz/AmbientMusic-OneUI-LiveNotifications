@@ -1,5 +1,6 @@
 package com.kieronquinn.app.ambientmusicmod.components.nowplayingsurface
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -36,6 +37,30 @@ class NowPlayingSurfacePolicyTest {
             NowPlayingSurfacePolicy.EXPERIMENTAL_PROMOTED.shouldRequestPromotion(
                 eligible.copy(channelBlocked = true)
             )
+        )
+    }
+
+    @Test
+    fun eventTimeoutIsBoundedAndHasSixtySecondFallback() {
+        assertEquals(
+            60_000L,
+            NowPlayingSurfaceEvent(title = "Song", artist = "Artist").boundedTimeoutMillis()
+        )
+        assertEquals(
+            30_000L,
+            NowPlayingSurfaceEvent(
+                title = "Song",
+                artist = "Artist",
+                timeoutMillis = 1L
+            ).boundedTimeoutMillis()
+        )
+        assertEquals(
+            600_000L,
+            NowPlayingSurfaceEvent(
+                title = "Song",
+                artist = "Artist",
+                timeoutMillis = Long.MAX_VALUE
+            ).boundedTimeoutMillis()
         )
     }
 }
