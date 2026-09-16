@@ -192,7 +192,7 @@ dependencies {
     implementation 'me.saket:better-link-movement-method:2.2.0'
 
     //Autostarter provides some OEM battery checks + starting settings for disabling them
-    implementation 'com.github.judemanutd:autostarter:1.1.6'
+    implementation 'com.github.judemanutd:autostarter:1.1.0'
 
     //Colour Picker for overlay text
     implementation 'com.github.duanhong169:colorpicker:1.1.6'
