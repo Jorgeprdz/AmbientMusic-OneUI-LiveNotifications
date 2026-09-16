@@ -42,14 +42,37 @@ jobs:
         run: |
           sdkmanager "platform-tools" "platforms;android-36" "build-tools;35.0.0"
 
+      - name: Isolate M0 application ID
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("app/build.gradle")
+          text = path.read_text()
+          needle = '''        debug {
+              minifyEnabled false
+          '''
+          replacement = '''        debug {
+              applicationIdSuffix ".m0probe"
+              versionNameSuffix "-m0"
+              minifyEnabled false
+          '''
+          if needle not in text:
+              raise SystemExit("debug buildType shape changed; refusing blind patch")
+          path.write_text(text.replace(needle, replacement, 1))
+          PY
+
       - name: Verify M0 scope
         shell: bash
         run: |
           set -euo pipefail
           grep -q "compileSdk 36" app/build.gradle
           grep -q "targetSdk 36" app/build.gradle
+          grep -q 'applicationIdSuffix ".m0probe"' app/build.gradle
           grep -q "androidx.core:core-ktx:1.17.0" app/build.gradle
           grep -q "android.permission.POST_PROMOTED_NOTIFICATIONS" app/src/debug/AndroidManifest.xml
+          grep -q 'tools:node="remove"' app/src/debug/AndroidManifest.xml
           grep -q "setRequestPromotedOngoing(true)" app/src/debug/java/com/kieronquinn/app/ambientmusicmod/debug/NowPlayingSurfaceProbe.kt
           grep -q "FLAG_PROMOTED_ONGOING" app/src/debug/java/com/kieronquinn/app/ambientmusicmod/debug/NowPlayingSurfaceProbe.kt
 
@@ -110,7 +133,7 @@ jobs:
       - name: Upload M0 APK
         uses: actions/upload-artifact@v4
         with:
-          name: AmbientMusicMod-M0-S25-Android16
+          name: AmbientMusicMod-M0B-Isolated-S25-Android16
           path: |
             ${{ env.APK_PATH }}
             ${{ env.TEST_APK_PATH }}
