@@ -9,11 +9,16 @@ import retrofit2.http.GET
 interface GitHubProvider {
 
     companion object {
-        fun getGitHubProvider(repository: String): GitHubProvider = Retrofit.Builder()
-            .baseUrl("https://api.github.com/repos/KieronQuinn/$repository/")
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(GitHubProvider::class.java)
+        internal fun getGitHubBaseUrl(owner: String, repository: String): String {
+            return "https://api.github.com/repos/$owner/$repository/"
+        }
+
+        fun getGitHubProvider(owner: String, repository: String): GitHubProvider =
+            Retrofit.Builder()
+                .baseUrl(getGitHubBaseUrl(owner, repository))
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
+                .create(GitHubProvider::class.java)
     }
 
     @GET("releases")
