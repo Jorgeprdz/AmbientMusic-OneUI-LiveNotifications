@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+          log-accepted-android-sdk-licenses: false
+
+      - name: Install Android API 36
+        shell: bash
+        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;35.0.0"
+
+      - name: Create ephemeral CI signing key
+        shell: bash
+        run: |
+          set -euo pipefail
+          KEYSTORE="$RUNNER_TEMP/ci-debug.p12"
+          keytool -genkeypair \
+            -alias ci \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 2 \
+            -storetype PKCS12 \
+            -keystore "$KEYSTORE" \
+            -storepass ci-only-password \
+            -keypass ci-only-password \
+            -dname "CN=CI Ephemeral, O=Ambient Music for One UI" \
+            -noprompt
+
+          cat > local.properties <<EOF
+          storeFile=$KEYSTORE
+          storePassword=ci-only-password
+          keyAlias=ci
+          keyPassword=ci-only-password
+          EOF
+
+      - name: Unit tests
+        shell: bash
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :app:testDebugUnitTest --stacktrace
+
+      - name: Compile instrumentation tests
+        shell: bash
+        run: ./gradlew :app:assembleDebugAndroidTest --stacktrace
+
+      - name: Compile release sources
+        shell: bash
+        run: ./gradlew :app:compileReleaseKotlin --stacktrace
