@@ -66,12 +66,23 @@ class UpdatesRepositoryImpl(
     companion object {
         private val CACHE_TIMEOUT = Duration.ofHours(12).toMillis()
         private const val MIN_SUMMARY_AND_EDIT_CODE = 120L
+
+        internal const val AMM_GITHUB_OWNER = "Jorgeprdz"
+        internal const val AMM_GITHUB_REPOSITORY = "AmbientMusic-OneUI-LiveNotifications"
+        internal const val PAM_GITHUB_OWNER = "KieronQuinn"
+        internal const val PAM_GITHUB_REPOSITORY = "NowPlaying"
     }
 
     private val packageManager = context.packageManager
     private val updatesCacheDir = File(context.cacheDir, "updates")
-    private val pamProvider = GitHubProvider.getGitHubProvider("NowPlaying")
-    private val ammProvider = GitHubProvider.getGitHubProvider("AmbientMusicMod")
+    private val pamProvider = GitHubProvider.getGitHubProvider(
+        PAM_GITHUB_OWNER,
+        PAM_GITHUB_REPOSITORY
+    )
+    private val ammProvider = GitHubProvider.getGitHubProvider(
+        AMM_GITHUB_OWNER,
+        AMM_GITHUB_REPOSITORY
+    )
 
     override val containerCheckUpdatesBus = MutableStateFlow(System.currentTimeMillis())
 
