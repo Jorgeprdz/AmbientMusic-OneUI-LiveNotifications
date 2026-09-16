@@ -4,43 +4,43 @@
 
 **Goal:** Publish a professional GPLv3 derivative of Ambient Music Mod named **Ambient Music for One UI**, with the validated Samsung Now Bar Live Update integration always enabled, stable paired signing, reproducible CI, documentation, and an experimental `v0.1.0` release.
 
-**Architecture:** Import the validated `feature/nowbar-m1m2` source as the new repository baseline, preserve Ambient Music Mod's recognition architecture, and keep the One UI presentation layer attached only to the central `RecognitionState` flow in `AmbientMusicModForegroundService`. Successful recognitions are mapped to `NowPlayingSurfaceEvent` and published through Android public Live Update APIs; promotion is always requested when capability checks pass, while unsupported devices safely fall back to standard notification behavior.
+**Architecture:** Import the validated `feature/nowbar-m1m2` source as the new repository baseline, preserve Ambient Music Mod's recognition architecture, and keep the One UI presentation layer attached only to the central `RecognitionState` flow in `AmbientMusicModForegroundService`. Successful recognitions map to `NowPlayingSurfaceEvent` and publish through Android public Live Update APIs; the derivative always selects `EXPERIMENTAL_PROMOTED`, while the publisher still gates promotion on runtime platform capabilities.
 
-**Tech Stack:** Android/Kotlin, Gradle, Android 16 / compileSdk 36, AndroidX Core 1.17+, Shizuku where upstream AMM requires it, GitHub Actions, JDK 17, Android SDK build-tools/apksigner, Bash, GitHub CLI, GPLv3.
+**Tech Stack:** Android/Kotlin, Gradle 8.x, Android 16 / compileSdk 36, AndroidX Core 1.17+, Shizuku where upstream AMM requires it, GitHub Actions, JDK 17, Android SDK build-tools 35.0.0, `apksigner`, `aapt`, Bash, GitHub CLI, GPLv3.
 
 **Spec:** `docs/superpowers/specs/2026-09-15-ambient-music-oneui-live-notifications-design.md`
 
 ## Global Constraints
 
-- Repository name: `AmbientMusic-OneUI-LiveNotifications`.
+- Repository: `Jorgeprdz/AmbientMusic-OneUI-LiveNotifications`.
 - Display name: **Ambient Music for One UI**.
 - Tagline: *Now Playing recognition in Samsung's Now Bar using Android Live Updates.*
-- Project is an unofficial derivative; do not imply affiliation with Samsung, Google, or Kieron Quinn.
-- Preserve GPLv3 licensing, upstream notices, and corresponding source availability.
-- Keep One UI Live Update behavior always enabled; do not add a user-facing toggle.
-- Use public Android notification APIs only; no Samsung private APIs, package spoofing, fake MediaSession behavior, root SystemUI changes, or privileged Samsung framework hooks.
+- Unofficial derivative; no implied affiliation with Samsung, Google, or Kieron Quinn.
+- GPLv3 remains the project license; retain upstream notices and corresponding source.
+- The One UI Live Update path is always enabled in this derivative; no user-facing toggle.
+- Public Android notification APIs only; no Samsung private APIs, package spoofing, fake MediaSession behavior, root SystemUI changes, or privileged Samsung framework hooks.
 - Initial validated target: Samsung Galaxy S25 `SM-S931B`, Android 16, One UI 8.x.
-- Keep `compileSdk 36`, `targetSdk 36`, AndroidX Core 1.17+, and `POST_PROMOTED_NOTIFICATIONS`.
-- Preserve the service-level recognition hook beside existing widget / overlay presentation paths.
-- Stable paired signer is private; never commit keystores, signing passwords, recovery files, `local.properties`, or exported secrets.
-- Release assets are `AmbientMusicMod-OneUI.apk`, `PixelAmbientMusic-1.3.5-paired.apk`, and `SHA256SUMS.txt`.
-- First public release is `v0.1.0`, marked **Experimental**.
-- CI must fail closed on missing signing material, signer mismatch, package mismatch, test failure, or APK verification failure.
+- Preserve `compileSdk 36`, `targetSdk 36`, AndroidX Core 1.17+, and `POST_PROMOTED_NOTIFICATIONS`.
+- Preserve the service-level hook beside widget/overlay presentation logic.
+- Stable signing key and recovery material remain private and never enter git or public artifacts.
+- Stable public certificate SHA-256: `321c34014d346541ab46637242d19fd1b18279b88fc2daa602fd47baa81dc815`.
+- Pinned upstream PAM 1.3.5 APK SHA-256: `11e3f12439d1b00e93174c6d2d9d6ff9000daec4e0bd03711d52cb25310223c1`.
+- Release assets: `AmbientMusicMod-OneUI.apk`, `PixelAmbientMusic-1.3.5-paired.apk`, `SHA256SUMS.txt`.
+- First release: `v0.1.0`, marked **Experimental / prerelease**.
+- CI fails closed on missing signing inputs, PAM source hash mismatch, signer mismatch, package mismatch, test failure, or APK verification failure.
 
 ---
 
 ## File Structure
 
-The new repository keeps the upstream source tree and adds focused project-level documentation and CI.
+**Validated implementation:**
 
-**Core implementation already validated and imported unchanged unless verification reveals drift:**
-
-- `app/src/main/java/com/kieronquinn/app/ambientmusicmod/components/nowplayingsurface/AndroidLiveUpdateNowPlayingSurfacePublisher.kt` — creates the channel, builds the public Live Update notification, checks platform capabilities, and publishes/clears the surface.
-- `app/src/main/java/com/kieronquinn/app/ambientmusicmod/components/nowplayingsurface/NowPlayingSurfacePolicy.kt` — defines standard vs promoted policy and capability gating.
-- `app/src/main/java/com/kieronquinn/app/ambientmusicmod/components/nowplayingsurface/NowPlayingSurfaceLifecycle.kt` — reacts to recognition states.
-- `app/src/main/java/com/kieronquinn/app/ambientmusicmod/components/nowplayingsurface/RecognitionNowPlayingSurfaceMapper.kt` — maps AMM recognition results into title/artist/timeout events.
-- `app/src/main/java/com/kieronquinn/app/ambientmusicmod/service/AmbientMusicModForegroundService.kt` — owns the central integration hook and always uses `EXPERIMENTAL_PROMOTED` in this derivative.
-- `app/src/main/AndroidManifest.xml` — Android 16 permissions including `POST_PROMOTED_NOTIFICATIONS`.
+- `app/src/main/java/com/kieronquinn/app/ambientmusicmod/components/nowplayingsurface/AndroidLiveUpdateNowPlayingSurfacePublisher.kt` — public Android Live Update notification publisher and capability checks.
+- `app/src/main/java/com/kieronquinn/app/ambientmusicmod/components/nowplayingsurface/NowPlayingSurfacePolicy.kt` — promotion decision.
+- `app/src/main/java/com/kieronquinn/app/ambientmusicmod/components/nowplayingsurface/NowPlayingSurfaceLifecycle.kt` — recognition-state lifecycle.
+- `app/src/main/java/com/kieronquinn/app/ambientmusicmod/components/nowplayingsurface/RecognitionNowPlayingSurfaceMapper.kt` — title/artist/timeout mapping.
+- `app/src/main/java/com/kieronquinn/app/ambientmusicmod/service/AmbientMusicModForegroundService.kt` — central production hook, using `EXPERIMENTAL_PROMOTED`.
+- `app/src/main/AndroidManifest.xml` — Android notification permissions.
 
 **Tests:**
 
@@ -48,67 +48,58 @@ The new repository keeps the upstream source tree and adds focused project-level
 - `app/src/test/java/com/kieronquinn/app/ambientmusicmod/components/nowplayingsurface/NowPlayingSurfaceLifecycleTest.kt`
 - `app/src/test/java/com/kieronquinn/app/ambientmusicmod/components/nowplayingsurface/RecognitionNowPlayingSurfaceMapperTest.kt`
 
-**Project presentation / policy files to create or replace:**
+**Project documentation:**
 
-- `README.md` — public project landing page, tested compatibility, installation, architecture summary, credits, non-affiliation, release model.
-- `LICENSE` — GPLv3 text retained from upstream.
-- `CHANGELOG.md` — release history beginning with `0.1.0`.
-- `CONTRIBUTING.md` — contribution and verification rules.
-- `SECURITY.md` — reporting guidance and signing-material policy.
-- `docs/ARCHITECTURE.md` — recognition-to-Now-Bar data flow and explicit non-goals.
-- `docs/INSTALLATION.md` — clean migration and paired-install instructions.
-- `docs/COMPATIBILITY.md` — tested-vs-expected device matrix.
-- `docs/UPSTREAM.md` — upstream lineage, pinned source commits, licensing, attribution.
-- `docs/VERIFICATION.md` — repeatable physical/ADB verification procedure.
-- `docs/assets/nowbar-s25-dream-on.jpg` — sanitized real-device proof image.
+- `README.md`
+- `LICENSE`
+- `CHANGELOG.md`
+- `CONTRIBUTING.md`
+- `SECURITY.md`
+- `docs/ARCHITECTURE.md`
+- `docs/INSTALLATION.md`
+- `docs/COMPATIBILITY.md`
+- `docs/UPSTREAM.md`
+- `docs/VERIFICATION.md`
+- `docs/assets/nowbar-s25-dream-on.jpg`
 
-**CI / release files:**
+**CI / release:**
 
-- `.github/workflows/ci.yml` — unsigned validation: unit tests, instrumentation-source compile, release-source compile.
-- `.github/workflows/paired-release.yml` — stable signer load, AMM build, pinned PAM download, paired signing, certificate/package verification, checksums, artifact upload.
-- `.github/workflows/release.yml` — tag-gated release packaging using the verified paired bundle.
+- `.github/workflows/ci.yml`
+- `.github/workflows/paired-release.yml`
+- `.github/workflows/release.yml`
 
 ---
 
-### Task 1: Create the public repository from the validated source state
+### Task 1: Bootstrap the new public repository from the validated branch
 
 **Files:**
-- Source: full tree from `Jorgeprdz/AmbientMusicMod` at `feature/nowbar-m1m2`
-- Create repository: `Jorgeprdz/AmbientMusic-OneUI-LiveNotifications`
-- Preserve: `.gitignore`, `LICENSE`, Gradle wrapper, source modules, upstream source notices
+- Source: complete tree from `Jorgeprdz/AmbientMusicMod` branch `feature/nowbar-m1m2`
+- Destination repository: `Jorgeprdz/AmbientMusic-OneUI-LiveNotifications`
 
 **Interfaces:**
-- Consumes: validated source at commit containing `28c6bf5df1010c4a4a8bf406d00b34b697cc881f` plus later stable-signing workflow commits.
-- Produces: a new public repository whose `main` branch contains the validated source and full upstream history or a clearly documented derivative import.
+- Consumes: current validated branch containing the Now Bar implementation and stable signing workflows.
+- Produces: a public `main` branch with the same source/history baseline.
 
-- [ ] **Step 1: Verify the source branch is clean and points at the expected implementation**
-
-Run in an authenticated local clone:
+- [ ] **Step 1: Verify branch identity and implementation before publishing**
 
 ```bash
 git fetch origin
 git checkout feature/nowbar-m1m2
 git status --short --branch
-git log -1 --oneline
-```
+git log -1 --format='%H %s'
 
-Expected: clean working tree on `feature/nowbar-m1m2`, with the current head containing the validated Now Bar integration and stable-signing changes.
-
-- [ ] **Step 2: Verify the implementation identity before import**
-
-```bash
-grep -R "NowPlayingSurfacePolicy.EXPERIMENTAL_PROMOTED" -n \
+grep -n "NowPlayingSurfacePolicy.EXPERIMENTAL_PROMOTED" \
   app/src/main/java/com/kieronquinn/app/ambientmusicmod/service/AmbientMusicModForegroundService.kt
 
 grep -R "setRequestPromotedOngoing" -n \
   app/src/main/java/com/kieronquinn/app/ambientmusicmod/components/nowplayingsurface
 
-grep -R "POST_PROMOTED_NOTIFICATIONS" -n app/src/main/AndroidManifest.xml
+grep -n "POST_PROMOTED_NOTIFICATIONS" app/src/main/AndroidManifest.xml
 ```
 
-Expected: exactly one production service policy reference, the public AndroidX promoted-notification call, and the manifest permission.
+Expected: clean branch, production service uses `EXPERIMENTAL_PROMOTED`, AndroidX promoted notification call exists, and manifest permission exists.
 
-- [ ] **Step 3: Create the new public GitHub repository without initializing it with unrelated files**
+- [ ] **Step 2: Create the empty public repository with GitHub CLI**
 
 ```bash
 gh repo create Jorgeprdz/AmbientMusic-OneUI-LiveNotifications \
@@ -117,18 +108,17 @@ gh repo create Jorgeprdz/AmbientMusic-OneUI-LiveNotifications \
   --disable-wiki
 ```
 
-Expected: repository created successfully and empty.
+Expected: repository creation succeeds and no README/license is auto-generated separately.
 
-- [ ] **Step 4: Add the new repository as a remote and publish the validated branch as `main`**
+- [ ] **Step 3: Publish the validated branch as the new repository's `main`**
 
 ```bash
-git remote add oneui git@github.com:Jorgeprdz/AmbientMusic-OneUI-LiveNotifications.git
+git remote remove oneui 2>/dev/null || true
+git remote add oneui https://github.com/Jorgeprdz/AmbientMusic-OneUI-LiveNotifications.git
 git push oneui feature/nowbar-m1m2:main
 ```
 
-Expected: new repository `main` contains the complete validated source tree.
-
-- [ ] **Step 5: Verify the published repository HEAD matches the local source HEAD**
+- [ ] **Step 4: Verify local and remote HEAD are identical**
 
 ```bash
 LOCAL_SHA="$(git rev-parse feature/nowbar-m1m2)"
@@ -137,39 +127,27 @@ printf 'LOCAL=%s\nREMOTE=%s\n' "$LOCAL_SHA" "$REMOTE_SHA"
 test "$LOCAL_SHA" = "$REMOTE_SHA"
 ```
 
-Expected: command exits 0 and both SHAs match.
-
-- [ ] **Step 6: Commit only if repository metadata files were added locally during bootstrap**
-
-If no files changed, do not create an empty commit. If metadata changed:
-
-```bash
-git add <changed-metadata-files>
-git commit -m "chore: bootstrap Ambient Music for One UI repository"
-git push oneui HEAD:main
-```
+Expected: exit 0.
 
 ---
 
-### Task 2: Lock the always-on promoted Live Update behavior with regression tests
+### Task 2: Lock the always-on promoted integration with tests
 
 **Files:**
-- Verify/Modify: `app/src/main/java/com/kieronquinn/app/ambientmusicmod/service/AmbientMusicModForegroundService.kt`
-- Verify/Modify: `app/src/main/java/com/kieronquinn/app/ambientmusicmod/components/nowplayingsurface/NowPlayingSurfacePolicy.kt`
+- Verify: `app/src/main/java/com/kieronquinn/app/ambientmusicmod/service/AmbientMusicModForegroundService.kt`
+- Verify: `app/src/main/java/com/kieronquinn/app/ambientmusicmod/components/nowplayingsurface/NowPlayingSurfacePolicy.kt`
 - Test: `app/src/test/java/com/kieronquinn/app/ambientmusicmod/components/nowplayingsurface/NowPlayingSurfacePolicyTest.kt`
 - Test: `app/src/test/java/com/kieronquinn/app/ambientmusicmod/components/nowplayingsurface/NowPlayingSurfaceLifecycleTest.kt`
 
 **Interfaces:**
 - Consumes: `NowPlayingSurfacePolicy.EXPERIMENTAL_PROMOTED`, `NowPlayingSurfaceCapabilities`, `NowPlayingSurfaceLifecycle`.
-- Produces: a tested invariant that this derivative requests promotion only when all required capabilities are true and that no user setting can disable the derivative-specific integration.
+- Produces: regression coverage proving promotion is capability-gated and transient recognition states do not erase a successful surface.
 
-- [ ] **Step 1: Add a regression test that promoted policy rejects incomplete capability sets**
-
-Add to `NowPlayingSurfacePolicyTest.kt` a parameterized or explicit test equivalent to:
+- [ ] **Step 1: Add/confirm the policy regression for incomplete capabilities**
 
 ```kotlin
 @Test
-fun `experimental promoted requires every promotion capability`() {
+fun `experimental promoted requires promotion capability`() {
     val capabilities = NowPlayingSurfaceCapabilities(
         notificationsEnabled = true,
         channelBlocked = false,
@@ -185,86 +163,72 @@ fun `experimental promoted requires every promotion capability`() {
 }
 ```
 
-- [ ] **Step 2: Run the focused policy test**
+- [ ] **Step 2: Run focused policy tests**
 
 ```bash
-./gradlew :app:testReleaseUnitTest \
-  --tests '*NowPlayingSurfacePolicyTest*'
-```
-
-Expected: PASS. If the exact Gradle variant task differs, use the existing unit-test task from the working CI workflow and record that exact command in `docs/VERIFICATION.md`.
-
-- [ ] **Step 3: Add a lifecycle regression test for clear-on-failure and preserve-during-transient behavior**
-
-Add tests equivalent to:
-
-```kotlin
-@Test
-fun `failed recognition clears published surface`() {
-    val publisher = RecordingPublisher()
-    val lifecycle = NowPlayingSurfaceLifecycle(publisher)
-
-    lifecycle.onRecognitionState(failedRecognitionState())
-
-    assertEquals(1, publisher.clearCount)
-}
-
-@Test
-fun `recording state does not clear last successful surface`() {
-    val publisher = RecordingPublisher()
-    val lifecycle = NowPlayingSurfaceLifecycle(publisher)
-
-    lifecycle.onRecognitionState(recordingRecognitionState())
-
-    assertEquals(0, publisher.clearCount)
-    assertTrue(publisher.events.isEmpty())
-}
-```
-
-Reuse the test fixtures/types already present in this test file instead of creating a second parallel fake hierarchy.
-
-- [ ] **Step 4: Run the lifecycle tests**
-
-```bash
-./gradlew :app:testReleaseUnitTest \
-  --tests '*NowPlayingSurfaceLifecycleTest*'
+./gradlew :app:testDebugUnitTest --tests '*NowPlayingSurfacePolicyTest*' --stacktrace
 ```
 
 Expected: PASS.
 
-- [ ] **Step 5: Verify the production service has no setting/toggle dependency for Now Bar**
+- [ ] **Step 3: Add/confirm lifecycle tests for clear and transient behavior**
+
+Use the existing test fakes in `NowPlayingSurfaceLifecycleTest.kt`; the assertions must prove:
+
+```kotlin
+assertEquals(1, publisher.clearCount) // Failed/Error
+assertEquals(0, publisher.clearCount) // Recording/Recognising
+assertTrue(publisher.events.isEmpty()) // Recording/Recognising
+```
+
+- [ ] **Step 4: Run focused lifecycle tests**
+
+```bash
+./gradlew :app:testDebugUnitTest --tests '*NowPlayingSurfaceLifecycleTest*' --stacktrace
+```
+
+Expected: PASS.
+
+- [ ] **Step 5: Verify there is no settings toggle in the production publisher construction**
 
 ```bash
 grep -n -A8 -B4 "nowPlayingSurfacePublisher" \
   app/src/main/java/com/kieronquinn/app/ambientmusicmod/service/AmbientMusicModForegroundService.kt
 ```
 
-Expected constructor policy is `NowPlayingSurfacePolicy.EXPERIMENTAL_PROMOTED` directly, not derived from a `SettingsRepository` flag.
+Expected: direct construction with `NowPlayingSurfacePolicy.EXPERIMENTAL_PROMOTED` and no `SettingsRepository` flag controlling the integration.
 
-- [ ] **Step 6: Commit the regression lock**
+- [ ] **Step 6: Commit only if test/source changes were required**
 
 ```bash
-git add app/src/test/java/com/kieronquinn/app/ambientmusicmod/components/nowplayingsurface
-git commit -m "test: lock One UI promoted Live Update behavior"
+git add app/src/main/java/com/kieronquinn/app/ambientmusicmod/components/nowplayingsurface \
+        app/src/main/java/com/kieronquinn/app/ambientmusicmod/service/AmbientMusicModForegroundService.kt \
+        app/src/test/java/com/kieronquinn/app/ambientmusicmod/components/nowplayingsurface
+git diff --cached --quiet || git commit -m "test: lock One UI promoted Live Update behavior"
 git push oneui HEAD:main
 ```
 
 ---
 
-### Task 3: Replace project-facing README and add professional upstream attribution
+### Task 3: Create the professional project identity, attribution, and policy docs
 
 **Files:**
-- Create/Replace: `README.md`
-- Create: `docs/UPSTREAM.md`
+- Replace/Create: `README.md`
 - Preserve: `LICENSE`
+- Create: `CHANGELOG.md`
+- Create: `CONTRIBUTING.md`
+- Create: `SECURITY.md`
+- Create: `docs/UPSTREAM.md`
+- Create: `docs/ARCHITECTURE.md`
+- Create: `docs/INSTALLATION.md`
+- Create: `docs/COMPATIBILITY.md`
+- Create: `docs/VERIFICATION.md`
 
 **Interfaces:**
-- Consumes: validated device facts, GPLv3 requirements, upstream repositories.
-- Produces: public-facing identity and attribution text referenced by installation, compatibility, and release docs.
+- Consumes: approved design and upstream GPLv3 lineage.
+- Produces: authoritative public documentation used by the release.
 
-- [ ] **Step 1: Write `README.md` with the exact project identity**
-
-The first section must contain:
+- [ ] **Step 1: Replace README introduction with exact derivative identity**
 
 ```markdown
 # Ambient Music for One UI
@@ -273,20 +237,30 @@ The first section must contain:
 
 **Experimental · Unofficial community project**
 
-Ambient Music for One UI is a GPLv3 derivative of Kieron Quinn's
-Ambient Music Mod that publishes successful Now Playing recognitions as
-Android Live Updates so supported Samsung One UI devices can present them
-in the Now Bar.
+Ambient Music for One UI is a GPLv3 derivative of Kieron Quinn's Ambient
+Music Mod that publishes successful Now Playing recognitions as Android Live
+Updates so supported Samsung One UI devices can present them in the Now Bar.
 
 This project is not affiliated with or endorsed by Samsung, Google, or
 Kieron Quinn.
 ```
 
-Follow with sections in this order: `Proof on real hardware`, `What it does`, `Tested compatibility`, `Installation`, `How it works`, `Limitations`, `Building`, `Paired signing`, `Credits & Acknowledgements`, `License`.
+README section order:
 
-- [ ] **Step 2: Add exact tested-compatibility wording**
+```text
+Proof on real hardware
+What it does
+Tested compatibility
+Installation
+How it works
+Limitations
+Building from source
+Paired signing
+Credits & Acknowledgements
+License
+```
 
-Use:
+- [ ] **Step 2: Add exact tested compatibility wording**
 
 ```markdown
 ## Tested compatibility
@@ -295,105 +269,32 @@ Use:
 |---|---|---:|---:|---|
 | Samsung Galaxy S25 | SM-S931B | 16 | 8.x | Physically validated |
 
-The initial validation recognised **Dream On — Aerosmith** and rendered
-the title and artist in Samsung's real lock-screen Now Bar. Devices not
-listed here are not claimed as confirmed compatible.
+The initial validation recognised **Dream On — Aerosmith** and rendered the
+title and artist in Samsung's real lock-screen Now Bar. Devices not listed
+here are not claimed as confirmed compatible.
 ```
 
-- [ ] **Step 3: Add `docs/UPSTREAM.md` with lineage and credits**
+- [ ] **Step 3: Create `docs/UPSTREAM.md` with explicit provenance**
 
-Include:
+It must state:
 
 ```markdown
-# Upstream and attribution
-
 This project is a modified GPLv3 derivative of:
 
 - KieronQuinn/AmbientMusicMod — primary application and recognition integration.
 - KieronQuinn/NowPlaying — Pixel Ambient Music / Now Playing component used by Ambient Music Mod.
 
-## One UI derivative work
-
 Jorge Palacios (`Jorgeprdz`) maintains this derivative and contributed the
 Android Live Update / Samsung Now Bar integration, paired-signing workflow,
 Galaxy S25 physical validation, packaging, and derivative documentation.
 
-The recognition engine and the original Ambient Music Mod application are
+The recognition engine and original Ambient Music Mod application are
 upstream work and are not claimed as original work of this derivative.
 ```
 
-Document upstream commit pins used to create the initial public release.
+Also record the upstream source commit pins used for `v0.1.0`.
 
-- [ ] **Step 4: Verify GPLv3 remains present and no attribution was removed**
-
-```bash
-grep -q "GNU GENERAL PUBLIC LICENSE" LICENSE
-grep -qi "Kieron Quinn" README.md
-grep -qi "KieronQuinn/AmbientMusicMod" docs/UPSTREAM.md
-grep -qi "GPLv3" README.md
-```
-
-Expected: all commands exit 0.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add README.md LICENSE docs/UPSTREAM.md
-git commit -m "docs: establish Ambient Music for One UI identity"
-git push oneui HEAD:main
-```
-
----
-
-### Task 4: Add installation, compatibility, architecture, security, and contribution documentation
-
-**Files:**
-- Create: `docs/INSTALLATION.md`
-- Create: `docs/COMPATIBILITY.md`
-- Create: `docs/ARCHITECTURE.md`
-- Create: `docs/VERIFICATION.md`
-- Create: `SECURITY.md`
-- Create: `CONTRIBUTING.md`
-- Create: `CHANGELOG.md`
-
-**Interfaces:**
-- Consumes: release filenames and package IDs.
-- Produces: authoritative docs referenced by README and release notes.
-
-- [ ] **Step 1: Write `docs/INSTALLATION.md` with paired-install rules**
-
-Document these package IDs and order:
-
-```text
-com.kieronquinn.app.pixelambientmusic
-com.kieronquinn.app.ambientmusicmod
-```
-
-Install PAM first, then AMM. State that an upstream-signed installation may need to be uninstalled because the derivative pair uses its own stable signer. State that app data may be lost on uninstall and users should back up AMM first.
-
-- [ ] **Step 2: Write `docs/COMPATIBILITY.md` with a strict tested/unknown distinction**
-
-Start with:
-
-```markdown
-# Compatibility
-
-## Physically validated
-
-- Samsung Galaxy S25 (`SM-S931B`)
-- Android 16
-- One UI 8.x
-
-## Not yet validated
-
-Other One UI devices may expose the same Android Live Update capability,
-but they are not considered supported until a physical recognition has
-been observed in the real Samsung Now Bar.
-```
-
-- [ ] **Step 3: Write `docs/ARCHITECTURE.md` with the exact data flow**
-
-Include:
+- [ ] **Step 4: Create `docs/ARCHITECTURE.md` with the exact data path**
 
 ```text
 Pixel Ambient Music / Now Playing
@@ -413,33 +314,39 @@ Android promoted ongoing notification
 Samsung SystemUI / Now Bar (platform decision)
 ```
 
-Explicitly document that Samsung—not the app—decides whether a valid promoted notification is rendered in Now Bar.
+State explicitly that Samsung SystemUI decides whether a valid promoted notification appears in Now Bar.
 
-- [ ] **Step 4: Write `docs/VERIFICATION.md` with an ADB physical test**
+- [ ] **Step 5: Create `docs/INSTALLATION.md`**
 
-Use package-aware commands that avoid substring/pipefail false positives:
+Document package IDs:
 
-```bash
-SERIAL="$(adb devices | awk 'NR>1 && $2=="device" {print $1; exit}')"
-adb -s "$SERIAL" shell getprop ro.product.model
-adb -s "$SERIAL" shell pm path com.kieronquinn.app.ambientmusicmod
-adb -s "$SERIAL" shell pm path com.kieronquinn.app.pixelambientmusic
-adb -s "$SERIAL" shell dumpsys notification --noredact > nowbar-notification.txt
+```text
+PAM: com.kieronquinn.app.pixelambientmusic
+AMM: com.kieronquinn.app.ambientmusicmod
 ```
 
-Then instruct the tester to confirm a successful recognition visually in the real lock-screen Now Bar and inspect the dump for `now_playing_surface_v1` plus promoted-ongoing evidence when exposed by the build.
+Document installation order: PAM first, AMM second. Warn that upstream-signed builds are not signature-compatible with this derivative pair and that users should back up AMM data before uninstalling.
 
-- [ ] **Step 5: Write `SECURITY.md` with signing-material exclusions**
+- [ ] **Step 6: Create `docs/COMPATIBILITY.md`**
 
-State that reports involving signing leakage, release tampering, or privilege boundaries should be reported privately through GitHub's security-reporting mechanism when enabled. Explicitly list the keystore, passwords, recovery text, and local properties as never-to-commit material.
+The only confirmed device at `v0.1.0` is Samsung Galaxy S25 `SM-S931B`, Android 16, One UI 8.x. Put other devices under an explicitly unvalidated section.
 
-- [ ] **Step 6: Write `CONTRIBUTING.md`**
+- [ ] **Step 7: Create `SECURITY.md` and `CONTRIBUTING.md`**
 
-Require a clean build, unit tests, no private Samsung APIs, no signer material, and evidence for newly claimed device compatibility.
+`SECURITY.md` must explicitly prohibit committing:
 
-- [ ] **Step 7: Write `CHANGELOG.md`**
+```text
+*.p12
+*.jks
+*.keystore
+local.properties
+NOWBAR-RECOVERY-KEEP-PRIVATE.txt
+signing passwords
+```
 
-Start with:
+`CONTRIBUTING.md` must require tests, public Android APIs only, no signing secrets, and physical evidence before adding a device to confirmed compatibility.
+
+- [ ] **Step 8: Create `CHANGELOG.md`**
 
 ```markdown
 # Changelog
@@ -454,59 +361,61 @@ Start with:
 - Physical validation on Samsung Galaxy S25 SM-S931B.
 ```
 
-- [ ] **Step 8: Verify docs contain no placeholders**
+- [ ] **Step 9: Verify docs and license**
 
 ```bash
+grep -q "GNU GENERAL PUBLIC LICENSE" LICENSE
+grep -qi "Kieron Quinn" README.md
+grep -qi "not affiliated" README.md
+grep -qi "GPLv3" README.md
+grep -qi "Jorgeprdz" docs/UPSTREAM.md
 ! grep -RniE '\b(TODO|TBD|FIXME)\b' \
-  README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md docs
+  README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md docs/ARCHITECTURE.md \
+  docs/INSTALLATION.md docs/COMPATIBILITY.md docs/UPSTREAM.md docs/VERIFICATION.md
 ```
 
-Expected: exit 0.
+Expected: all checks exit 0.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 10: Commit documentation**
 
 ```bash
-git add README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md docs
-git commit -m "docs: add installation architecture and project policy"
+git add README.md LICENSE CHANGELOG.md CONTRIBUTING.md SECURITY.md docs
+git commit -m "docs: establish Ambient Music for One UI project"
 git push oneui HEAD:main
 ```
 
 ---
 
-### Task 5: Add sanitized real-device proof media
+### Task 4: Add sanitized real-device proof media
 
 **Files:**
 - Create: `docs/assets/nowbar-s25-dream-on.jpg`
 - Modify: `README.md`
 
 **Interfaces:**
-- Consumes: real Galaxy S25 screenshot from physical validation.
-- Produces: a privacy-reviewed project proof image referenced by README.
+- Consumes: the real Galaxy S25 screenshot from the successful `Dream On — Aerosmith` validation.
+- Produces: privacy-reviewed visual proof referenced by README.
 
-- [ ] **Step 1: Review the candidate screenshot for personal information**
+- [ ] **Step 1: Use the lock-screen screenshot that shows the Now Bar result**
 
-Confirm the crop contains the lock-screen Now Bar result and no notifications, account identifiers, phone numbers, email addresses, location details, or unrelated private content.
+Before adding it, verify the image contains no email address, phone number, account identifier, location detail, unrelated notification content, or other private data. Crop only enough to remove private data while retaining lock-screen context proving this is Samsung's actual Now Bar.
 
-- [ ] **Step 2: Crop only if necessary**
-
-Keep enough Samsung lock-screen context to demonstrate that the result is in the actual Now Bar rather than an in-app mockup.
-
-- [ ] **Step 3: Add the image to the repository**
+- [ ] **Step 2: Save the reviewed image at the canonical repository path**
 
 ```bash
 mkdir -p docs/assets
-cp <sanitized-screenshot> docs/assets/nowbar-s25-dream-on.jpg
+cp /sdcard/Download/nowbar-s25-dream-on.jpg docs/assets/nowbar-s25-dream-on.jpg
 ```
 
-- [ ] **Step 4: Reference it from README**
+The execution workflow must first copy/export the approved screenshot to `/sdcard/Download/nowbar-s25-dream-on.jpg`; do not substitute a generated mockup.
 
-Add directly below the introduction:
+- [ ] **Step 3: Add the README image reference**
 
 ```markdown
 ![Ambient Music for One UI showing Dream On by Aerosmith in Samsung Now Bar](docs/assets/nowbar-s25-dream-on.jpg)
 ```
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add README.md docs/assets/nowbar-s25-dream-on.jpg
@@ -516,22 +425,20 @@ git push oneui HEAD:main
 
 ---
 
-### Task 6: Replace prototype workflows with production CI and paired-release workflows
+### Task 5: Replace prototype workflows with production CI and stable paired packaging
 
 **Files:**
-- Remove from public baseline after equivalent checks are preserved: `.github/workflows/m0-live-update.yml`
-- Replace/Consolidate: `.github/workflows/m1m2-nowbar.yml`
-- Replace/Consolidate: `.github/workflows/nowbar-paired-bundle.yml`
 - Create: `.github/workflows/ci.yml`
 - Create: `.github/workflows/paired-release.yml`
+- Remove after parity: `.github/workflows/m0-live-update.yml`
+- Remove after parity: `.github/workflows/m1m2-nowbar.yml`
+- Remove after parity: `.github/workflows/nowbar-paired-bundle.yml`
 
 **Interfaces:**
-- Consumes: Gradle project, stable signing secrets, pinned PAM 1.3.5 source artifact, expected certificate SHA-256.
-- Produces: unsigned PR/push CI plus manually runnable signed paired bundle.
+- Consumes: Gradle project, stable signing secrets, pinned official PAM 1.3.5 artifact.
+- Produces: unsigned validation CI and a signed paired bundle verified against the stable certificate.
 
-- [ ] **Step 1: Create `.github/workflows/ci.yml` without any signing secrets**
-
-Required jobs/steps:
+- [ ] **Step 1: Create `.github/workflows/ci.yml` using non-signing Gradle tasks**
 
 ```yaml
 name: CI
@@ -542,37 +449,37 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  test:
+  validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+          log-accepted-android-sdk-licenses: false
+      - name: Install Android API 36
+        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;35.0.0"
       - name: Unit tests
-        run: ./gradlew :app:testReleaseUnitTest
-      - name: Compile instrumentation tests
-        run: ./gradlew :app:compileReleaseAndroidTestKotlin
-      - name: Compile release sources
-        run: ./gradlew :app:assembleRelease
+        run: ./gradlew :app:testDebugUnitTest --stacktrace
+      - name: Compile instrumentation APK
+        run: ./gradlew :app:assembleDebugAndroidTest --stacktrace
+      - name: Compile production release sources
+        run: ./gradlew :app:compileReleaseKotlin --stacktrace
 ```
 
-If upstream release signing configuration requires local signing properties even for `assembleRelease`, use the validated non-secret compile task from the existing `m1m2-nowbar.yml` instead of injecting production secrets into CI.
+- [ ] **Step 2: Create `.github/workflows/paired-release.yml` from the validated stable workflow**
 
-- [ ] **Step 2: Create `.github/workflows/paired-release.yml` by hardening the validated stable workflow**
-
-Keep the existing known-good stable-signing logic, but rename artifacts to:
-
-```text
-AmbientMusicMod-OneUI.apk
-PixelAmbientMusic-1.3.5-paired.apk
-SHA256SUMS.txt
-```
-
-Require these secrets by explicit non-empty checks before decoding anything:
+Use JDK 17, Android API 36, build-tools 35.0.0, and these secrets:
 
 ```text
 NOWBAR_KEYSTORE_B64
@@ -582,74 +489,121 @@ NOWBAR_KEY_PASSWORD
 NOWBAR_CERT_SHA256
 ```
 
-- [ ] **Step 3: Make signer verification fail closed**
+Before decoding the key, fail if any value is empty.
 
-After signing both APKs:
+- [ ] **Step 3: Pin and verify upstream PAM 1.3.5 before signing**
 
 ```bash
-apksigner verify --verbose AmbientMusicMod-OneUI.apk
-apksigner verify --verbose PixelAmbientMusic-1.3.5-paired.apk
+curl -fL --retry 3 \
+  'https://github.com/KieronQuinn/NowPlaying/releases/download/1.3.5/NowPlaying-v1.3.5.apk' \
+  -o pair/PixelAmbientMusic-1.3.5-official.apk
 
-AMM_CERT="$(apksigner verify --print-certs AmbientMusicMod-OneUI.apk \
-  | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | tr '[:upper:]' '[:lower:]')"
-PAM_CERT="$(apksigner verify --print-certs PixelAmbientMusic-1.3.5-paired.apk \
-  | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | tr '[:upper:]' '[:lower:]')"
+echo '11e3f12439d1b00e93174c6d2d9d6ff9000daec4e0bd03711d52cb25310223c1  pair/PixelAmbientMusic-1.3.5-official.apk' \
+  | sha256sum -c -
+```
+
+Expected: `OK`; otherwise workflow stops.
+
+- [ ] **Step 4: Build AMM release using the stable secret-backed signing config**
+
+```bash
+./gradlew :app:testDebugUnitTest --stacktrace
+./gradlew :app:assembleDebugAndroidTest --stacktrace
+./gradlew :app:assembleRelease --stacktrace
+```
+
+- [ ] **Step 5: Produce canonical filenames and sign PAM with the same key**
+
+```bash
+mkdir -p pair
+AMM_SOURCE="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | head -n1)"
+test -n "$AMM_SOURCE"
+cp "$AMM_SOURCE" pair/AmbientMusicMod-OneUI.apk
+
+BUILD_TOOLS="$ANDROID_SDK_ROOT/build-tools/35.0.0"
+"$BUILD_TOOLS/zipalign" -f -p 4 \
+  pair/PixelAmbientMusic-1.3.5-official.apk \
+  pair/PixelAmbientMusic-1.3.5-aligned.apk
+
+"$BUILD_TOOLS/apksigner" sign \
+  --ks "$KEYSTORE" \
+  --ks-type PKCS12 \
+  --ks-key-alias "$NOWBAR_KEY_ALIAS" \
+  --ks-pass "pass:$NOWBAR_STORE_PASSWORD" \
+  --key-pass "pass:$NOWBAR_KEY_PASSWORD" \
+  --out pair/PixelAmbientMusic-1.3.5-paired.apk \
+  pair/PixelAmbientMusic-1.3.5-aligned.apk
+```
+
+- [ ] **Step 6: Fail closed on signature and package mismatch**
+
+```bash
+APK_SIGNER="$ANDROID_SDK_ROOT/build-tools/35.0.0/apksigner"
+AAPT="$ANDROID_SDK_ROOT/build-tools/35.0.0/aapt"
+
+"$APK_SIGNER" verify --verbose pair/AmbientMusicMod-OneUI.apk
+"$APK_SIGNER" verify --verbose pair/PixelAmbientMusic-1.3.5-paired.apk
+
+AMM_CERT="$($APK_SIGNER verify --print-certs pair/AmbientMusicMod-OneUI.apk \
+  | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n1 | tr '[:upper:]' '[:lower:]')"
+PAM_CERT="$($APK_SIGNER verify --print-certs pair/PixelAmbientMusic-1.3.5-paired.apk \
+  | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n1 | tr '[:upper:]' '[:lower:]')"
 EXPECTED="$(printf '%s' "$NOWBAR_CERT_SHA256" | tr '[:upper:]' '[:lower:]')"
 
 test -n "$AMM_CERT"
+test -n "$PAM_CERT"
 test "$AMM_CERT" = "$PAM_CERT"
 test "$AMM_CERT" = "$EXPECTED"
+
+AMM_PACKAGE="$($AAPT dump badging pair/AmbientMusicMod-OneUI.apk \
+  | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -n1)"
+PAM_PACKAGE="$($AAPT dump badging pair/PixelAmbientMusic-1.3.5-paired.apk \
+  | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -n1)"
+
+test "$AMM_PACKAGE" = 'com.kieronquinn.app.ambientmusicmod'
+test "$PAM_PACKAGE" = 'com.kieronquinn.app.pixelambientmusic'
 ```
 
-- [ ] **Step 4: Verify package IDs from APK metadata**
-
-Use `aapt2 dump badging` or `apkanalyzer manifest application-id` and assert:
-
-```text
-AMM: com.kieronquinn.app.ambientmusicmod
-PAM: com.kieronquinn.app.pixelambientmusic
-```
-
-- [ ] **Step 5: Generate checksums**
+- [ ] **Step 7: Generate release checksums and upload only public release files**
 
 ```bash
-sha256sum \
-  AmbientMusicMod-OneUI.apk \
-  PixelAmbientMusic-1.3.5-paired.apk \
-  > SHA256SUMS.txt
+cd pair
+sha256sum AmbientMusicMod-OneUI.apk PixelAmbientMusic-1.3.5-paired.apk > SHA256SUMS.txt
 ```
 
-- [ ] **Step 6: Upload exactly the release bundle**
+`actions/upload-artifact@v4` must upload exactly those three files. Remove temporary official/aligned PAM copies before upload.
 
-Use `actions/upload-artifact@v4` with the three release files only. Do not upload decoded keystore files, `local.properties`, or temporary secret material.
+- [ ] **Step 8: Remove prototype workflows only after the new workflows contain equivalent checks**
 
-- [ ] **Step 7: Remove prototype-only workflow exposure after parity is verified**
+```bash
+git rm .github/workflows/m0-live-update.yml \
+       .github/workflows/m1m2-nowbar.yml \
+       .github/workflows/nowbar-paired-bundle.yml
+```
 
-Delete `m0-live-update.yml` from the new public repository. Retire `m1m2-nowbar.yml` and `nowbar-paired-bundle.yml` only after `ci.yml` and `paired-release.yml` reproduce their required validation/signing checks.
-
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add .github/workflows
-git commit -m "ci: add production validation and paired release workflows"
+git commit -m "ci: add production One UI validation and paired packaging"
 git push oneui HEAD:main
 ```
 
 ---
 
-### Task 7: Configure signing secrets in the new repository without exposing recovery material
+### Task 6: Configure the stable signer in the new repository without exposing secrets
 
 **Files:**
-- No tracked files containing secret values.
-- Verify: `.gitignore`
+- Modify if needed: `.gitignore`
+- No tracked secret-value file.
 
 **Interfaces:**
-- Consumes: existing private stable PKCS12 backup and recovery data from the owner's secure storage.
-- Produces: GitHub Actions repository secrets only.
+- Consumes: private stable PKCS12/recovery material already held by the owner.
+- Produces: five GitHub Actions repository secrets.
 
-- [ ] **Step 1: Confirm secret files are ignored before touching them**
+- [ ] **Step 1: Harden `.gitignore`**
 
-Ensure `.gitignore` contains patterns equivalent to:
+Ensure these entries exist:
 
 ```gitignore
 *.jks
@@ -659,17 +613,18 @@ local.properties
 *RECOVERY*PRIVATE*
 ```
 
-- [ ] **Step 2: Scan the repository history/tree for accidental secret file names**
+- [ ] **Step 2: Confirm no private signing files are tracked**
 
 ```bash
-git ls-files | grep -Ei '(\.p12$|\.jks$|\.keystore$|recovery|local\.properties$)' && exit 1 || true
+if git ls-files | grep -Ei '(\.p12$|\.jks$|\.keystore$|NOWBAR-RECOVERY|local\.properties$)'; then
+  echo 'SECRET_FILE_TRACKED=FAIL'
+  exit 1
+fi
 ```
 
-Expected: no tracked private signing files.
+- [ ] **Step 3: Set the five secrets from private local values without printing them**
 
-- [ ] **Step 3: Configure the five required secrets using GitHub CLI**
-
-Use the existing private values locally. Never echo passwords to terminal output or commit them. Configure:
+Required names:
 
 ```text
 NOWBAR_KEYSTORE_B64
@@ -679,153 +634,120 @@ NOWBAR_KEY_PASSWORD
 NOWBAR_CERT_SHA256
 ```
 
-Use `gh secret set ...` with stdin or a secure local environment variable; do not place secret literals in shell history.
+Use `gh secret set NAME --repo Jorgeprdz/AmbientMusic-OneUI-LiveNotifications` with value supplied through stdin or the interactive hidden-value prompt. Never put secret literals in a committed script.
 
-- [ ] **Step 4: Verify only secret names, not values**
+- [ ] **Step 4: Verify secret names only**
 
 ```bash
 gh secret list --repo Jorgeprdz/AmbientMusic-OneUI-LiveNotifications
 ```
 
-Expected: all five required names exist.
+Expected: all five names are listed; values remain hidden.
 
-- [ ] **Step 5: Commit only `.gitignore` if it changed**
+- [ ] **Step 5: Commit `.gitignore` only if changed**
 
 ```bash
 git add .gitignore
-git commit -m "chore: harden signing secret exclusions" || true
+git diff --cached --quiet || git commit -m "chore: harden signing secret exclusions"
 git push oneui HEAD:main
 ```
 
 ---
 
-### Task 8: Run CI and paired-build verification in the new repository
-
-**Files:**
-- No source change required unless verification finds a specific defect.
-
-**Interfaces:**
-- Consumes: Task 6 workflows and Task 7 secrets.
-- Produces: green CI and a signer-verified paired artifact bundle.
-
-- [ ] **Step 1: Run the normal CI workflow**
-
-```bash
-gh workflow run ci.yml \
-  --repo Jorgeprdz/AmbientMusic-OneUI-LiveNotifications
-```
-
-- [ ] **Step 2: Watch CI to completion**
-
-```bash
-gh run watch \
-  --repo Jorgeprdz/AmbientMusic-OneUI-LiveNotifications \
-  --exit-status
-```
-
-Expected: unit tests, Android-test source compile, and release-source compile all pass.
-
-- [ ] **Step 3: Trigger the signed paired-release workflow**
-
-```bash
-gh workflow run paired-release.yml \
-  --repo Jorgeprdz/AmbientMusic-OneUI-LiveNotifications
-```
-
-- [ ] **Step 4: Watch the paired workflow to completion**
-
-```bash
-gh run watch \
-  --repo Jorgeprdz/AmbientMusic-OneUI-LiveNotifications \
-  --exit-status
-```
-
-Expected: build, signing, certificate verification, package verification, checksum generation, and artifact upload all pass.
-
-- [ ] **Step 5: Download and verify the artifact locally**
-
-```bash
-mkdir -p /tmp/ambient-oneui-release
-gh run download \
-  --repo Jorgeprdz/AmbientMusic-OneUI-LiveNotifications \
-  --dir /tmp/ambient-oneui-release
-
-cd /tmp/ambient-oneui-release
-sha256sum -c SHA256SUMS.txt
-```
-
-Expected: both APKs report `OK`.
-
-- [ ] **Step 6: Record the green run IDs and certificate digest in `docs/VERIFICATION.md`**
-
-Do not record secret values. Recording the public certificate SHA-256 digest is acceptable.
-
-- [ ] **Step 7: Commit the verification record**
-
-```bash
-git add docs/VERIFICATION.md
-git commit -m "docs: record reproducible release verification"
-git push oneui HEAD:main
-```
-
----
-
-### Task 9: Perform a clean physical install and capture promoted-notification evidence
+### Task 7: Run CI, paired build, clean-device verification, and preserve evidence
 
 **Files:**
 - Modify: `docs/VERIFICATION.md`
-- Optional non-sensitive evidence: `docs/evidence/s25-nowbar-notification.txt`
+- Optional sanitized evidence: `docs/evidence/s25-nowbar-notification.txt`
 
 **Interfaces:**
-- Consumes: exact APKs produced by Task 8.
-- Produces: device/package/recognition/Now-Bar evidence tied to the release candidate.
+- Consumes: green CI workflow, signed paired artifact, Samsung Galaxy S25.
+- Produces: reproducible CI evidence plus physical recognition/Now Bar evidence.
 
-- [ ] **Step 1: Verify the connected device is the intended S25 before any package operation**
+- [ ] **Step 1: Trigger and watch CI**
+
+```bash
+gh workflow run ci.yml --repo Jorgeprdz/AmbientMusic-OneUI-LiveNotifications
+sleep 3
+CI_RUN="$(gh run list --repo Jorgeprdz/AmbientMusic-OneUI-LiveNotifications --workflow ci.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
+gh run watch "$CI_RUN" --repo Jorgeprdz/AmbientMusic-OneUI-LiveNotifications --exit-status
+```
+
+Expected: PASS.
+
+- [ ] **Step 2: Trigger and watch stable paired packaging**
+
+```bash
+gh workflow run paired-release.yml --repo Jorgeprdz/AmbientMusic-OneUI-LiveNotifications
+sleep 3
+PAIR_RUN="$(gh run list --repo Jorgeprdz/AmbientMusic-OneUI-LiveNotifications --workflow paired-release.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
+gh run watch "$PAIR_RUN" --repo Jorgeprdz/AmbientMusic-OneUI-LiveNotifications --exit-status
+```
+
+Expected: PASS.
+
+- [ ] **Step 3: Download and checksum the exact paired artifact**
+
+```bash
+rm -rf /tmp/ambient-oneui-pair
+mkdir -p /tmp/ambient-oneui-pair
+gh run download "$PAIR_RUN" \
+  --repo Jorgeprdz/AmbientMusic-OneUI-LiveNotifications \
+  --dir /tmp/ambient-oneui-pair
+cd /tmp/ambient-oneui-pair
+CHECKSUM_FILE="$(find . -name SHA256SUMS.txt -print -quit)"
+test -n "$CHECKSUM_FILE"
+cd "$(dirname "$CHECKSUM_FILE")"
+sha256sum -c SHA256SUMS.txt
+```
+
+Expected: both APKs `OK`.
+
+- [ ] **Step 4: Gate ADB operations on the exact physical model**
 
 ```bash
 SERIAL="$(adb devices | awk 'NR>1 && $2=="device" {print $1; exit}')"
+test -n "$SERIAL"
 MODEL="$(adb -s "$SERIAL" shell getprop ro.product.model | tr -d '\r')"
-DEVICE="$(adb -s "$SERIAL" shell getprop ro.product.device | tr -d '\r')"
-printf 'SERIAL=%s\nMODEL=%s\nDEVICE=%s\n' "$SERIAL" "$MODEL" "$DEVICE"
-test "$MODEL" = "SM-S931B"
+CODENAME="$(adb -s "$SERIAL" shell getprop ro.product.device | tr -d '\r')"
+printf 'SERIAL=%s\nMODEL=%s\nCODENAME=%s\n' "$SERIAL" "$MODEL" "$CODENAME"
+test "$MODEL" = 'SM-S931B'
 ```
 
-Expected: model gate passes before any uninstall/install step.
+Expected: model gate passes before install/uninstall actions.
 
-- [ ] **Step 2: Back up AMM data using its native backup flow if preserving current settings/history matters**
+- [ ] **Step 5: Preserve AMM data if needed, then install the paired candidate PAM first and AMM second**
 
-Do not proceed with destructive uninstall unless a valid backup exists or the owner explicitly accepts resetting the app.
-
-- [ ] **Step 3: Install the exact paired release candidate**
-
-For a clean signature test, uninstall conflicting upstream/previously signed AMM and PAM packages, then install PAM first and AMM second. Verify each with `adb shell pm path <exact-package>` rather than substring matching.
-
-- [ ] **Step 4: Complete upstream-required AMM setup / Shizuku authorization**
-
-Use the normal AMM setup flow; do not bypass its privilege checks with unsupported shell edits.
-
-- [ ] **Step 5: Trigger a real recognition**
-
-Use AMM's recognition UI or verified exported recognition path. Play a known song near the device and wait for a successful recognition.
-
-- [ ] **Step 6: Verify Samsung Now Bar visually**
-
-Confirm title and artist appear in the actual lock-screen Now Bar after recognition. Record the exact song used and OS/build context.
-
-- [ ] **Step 7: Capture notification evidence**
+Use AMM's native backup before destructive uninstall if current settings/history must be preserved. Verify installation with exact package paths:
 
 ```bash
+adb -s "$SERIAL" shell pm path com.kieronquinn.app.pixelambientmusic
+adb -s "$SERIAL" shell pm path com.kieronquinn.app.ambientmusicmod
+```
+
+- [ ] **Step 6: Complete normal upstream AMM/Shizuku setup and run a real recognition**
+
+Do not bypass setup state or Shizuku privilege checks through private preference edits. Play a known track and obtain a real `RecognitionState.Recognised` result.
+
+- [ ] **Step 7: Verify the real Samsung lock-screen Now Bar visually**
+
+Record the song, title/artist visibility, device model, Android version, and One UI version. Do not infer visual rendering from notification state alone.
+
+- [ ] **Step 8: Capture notification evidence and sanitize it before committing**
+
+```bash
+mkdir -p docs/evidence
 adb -s "$SERIAL" shell dumpsys notification --noredact \
   | grep -i -A40 -B10 -E \
     'now_playing_surface_v1|ambientmusicmod|promoted|FLAG_PROMOTED_ONGOING' \
-  > s25-nowbar-notification.txt
+  > docs/evidence/s25-nowbar-notification.txt
 ```
 
-Review the file before committing; remove unrelated notification data if present.
+Review the file and remove unrelated notification/account data. Mark `Promoted ongoing evidence` as PASS only if the dump explicitly exposes it; otherwise write `NOT EXPOSED BY DUMPSYS`.
 
-- [ ] **Step 8: Update `docs/VERIFICATION.md` with the physical result**
+- [ ] **Step 9: Record run IDs and physical verdict in `docs/VERIFICATION.md`**
 
-Record:
+Use this result block with real run IDs substituted as numeric values during execution:
 
 ```text
 Device: Samsung Galaxy S25
@@ -835,12 +757,13 @@ One UI: 8.x
 Recognition: PASS
 Now Bar visual: PASS
 Notification channel: now_playing_surface_v1
-Promoted ongoing evidence: PASS / NOT EXPOSED BY DUMPSYS
+Promoted ongoing evidence: PASS or NOT EXPOSED BY DUMPSYS
+CI run: numeric GitHub Actions run ID
+Paired build run: numeric GitHub Actions run ID
+Stable certificate SHA-256: 321c34014d346541ab46637242d19fd1b18279b88fc2daa602fd47baa81dc815
 ```
 
-Do not mark promoted evidence PASS unless the dump actually contains it.
-
-- [ ] **Step 9: Commit sanitized evidence**
+- [ ] **Step 10: Commit sanitized verification evidence**
 
 ```bash
 git add docs/VERIFICATION.md docs/evidence/s25-nowbar-notification.txt
@@ -850,20 +773,38 @@ git push oneui HEAD:main
 
 ---
 
-### Task 10: Add tag-gated release publication and prepare `v0.1.0`
+### Task 8: Publish the verified experimental `v0.1.0` release and audit the repo
 
 **Files:**
 - Create: `.github/workflows/release.yml`
+- Modify: `README.md`
 - Modify: `CHANGELOG.md`
-- Modify: `README.md` if release links/status need finalization
 
 **Interfaces:**
-- Consumes: signer-verified paired bundle from `paired-release.yml` and green physical verification.
-- Produces: GitHub release `v0.1.0` with exact release assets and source at the same tag.
+- Consumes: green Task 7 evidence and stable paired packaging logic.
+- Produces: prerelease `v0.1.0` with exactly three assets and a final provenance/security verdict.
 
-- [ ] **Step 1: Create `.github/workflows/release.yml`**
+- [ ] **Step 1: Create tag-gated `.github/workflows/release.yml`**
 
-Trigger only on tags matching `v*` and/or manual dispatch with a required tag input. The workflow must rebuild or retrieve a bundle from the same commit, rerun certificate/package/checksum verification, then create a GitHub release containing only:
+Trigger on:
+
+```yaml
+on:
+  push:
+    tags:
+      - 'v*'
+```
+
+Set:
+
+```yaml
+permissions:
+  contents: write
+```
+
+The workflow must rebuild the paired bundle from the tagged commit using the same stable-signing, PAM-hash, signer, package-ID, and checksum checks from `paired-release.yml` before creating a release.
+
+- [ ] **Step 2: Make release creation upload exactly three files**
 
 ```text
 AmbientMusicMod-OneUI.apk
@@ -871,21 +812,9 @@ PixelAmbientMusic-1.3.5-paired.apk
 SHA256SUMS.txt
 ```
 
-- [ ] **Step 2: Make the workflow reject unverified artifacts**
+Use GitHub CLI or a maintained release action only after all verification commands exit 0. Set the release as prerelease/experimental.
 
-Before release creation, run:
-
-```bash
-sha256sum -c SHA256SUMS.txt
-apksigner verify --verbose AmbientMusicMod-OneUI.apk
-apksigner verify --verbose PixelAmbientMusic-1.3.5-paired.apk
-```
-
-and repeat the exact certificate-equality checks from `paired-release.yml`.
-
-- [ ] **Step 3: Add release notes template text**
-
-Release notes must include:
+- [ ] **Step 3: Use exact release notes**
 
 ```markdown
 ## Ambient Music for One UI v0.1.0 — Experimental
@@ -908,18 +837,34 @@ This project is a modified GPLv3 derivative of Kieron Quinn's Ambient Music
 Mod and related Now Playing work. See `docs/UPSTREAM.md` for attribution.
 ```
 
-- [ ] **Step 4: Run the complete pre-release verification suite**
+- [ ] **Step 4: Run the complete pre-tag audit**
 
 ```bash
-./gradlew :app:testReleaseUnitTest
-./gradlew :app:compileReleaseAndroidTestKotlin
+./gradlew :app:testDebugUnitTest --stacktrace
+./gradlew :app:assembleDebugAndroidTest --stacktrace
+./gradlew :app:compileReleaseKotlin --stacktrace
+
+grep -q "GNU GENERAL PUBLIC LICENSE" LICENSE
+grep -qi "Kieron Quinn" README.md
+grep -qi "not affiliated" README.md
+grep -qi "GPLv3" README.md
+
+if git ls-files | grep -Ei '(\.p12$|\.jks$|\.keystore$|NOWBAR-RECOVERY|local\.properties$)'; then
+  echo 'SECRET_FILE_TRACKED=FAIL'
+  exit 1
+fi
+
+if git grep -nEi '(BEGIN PRIVATE KEY|NOWBAR_STORE_PASSWORD=[^$]|NOWBAR_KEY_PASSWORD=[^$])' -- . ':!docs/superpowers'; then
+  echo 'SECRET_LITERAL_SCAN=FAIL'
+  exit 1
+fi
+
 git status --short
-! git grep -nEi '(storePassword|keyPassword|BEGIN PRIVATE KEY|NOWBAR_STORE_PASSWORD=)' -- . ':!docs/superpowers'
 ```
 
-Expected: tests PASS, working tree clean after intended commits, and no secret literals found.
+Expected: tests compile/pass, attribution checks pass, secret scans find nothing, and working tree is clean.
 
-- [ ] **Step 5: Commit the release workflow**
+- [ ] **Step 5: Commit release workflow before tagging**
 
 ```bash
 git add .github/workflows/release.yml README.md CHANGELOG.md
@@ -927,73 +872,31 @@ git commit -m "ci: add verified experimental release workflow"
 git push oneui HEAD:main
 ```
 
-- [ ] **Step 6: Tag the exact verified commit**
+- [ ] **Step 6: Tag the exact audited commit**
 
 ```bash
 git tag -a v0.1.0 -m "Ambient Music for One UI v0.1.0"
 git push oneui v0.1.0
 ```
 
-- [ ] **Step 7: Verify the release after workflow completion**
+- [ ] **Step 7: Watch the tag workflow and verify the published release**
 
 ```bash
+RELEASE_RUN="$(gh run list --repo Jorgeprdz/AmbientMusic-OneUI-LiveNotifications --workflow release.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
+gh run watch "$RELEASE_RUN" --repo Jorgeprdz/AmbientMusic-OneUI-LiveNotifications --exit-status
+
 gh release view v0.1.0 \
-  --repo Jorgeprdz/AmbientMusic-OneUI-LiveNotifications
+  --repo Jorgeprdz/AmbientMusic-OneUI-LiveNotifications \
+  --json tagName,isPrerelease,assets
 ```
 
-Expected: release is marked Experimental/pre-release as configured, source tag is correct, and exactly the three intended assets are present.
+Expected: `tagName=v0.1.0`, prerelease true, exactly three assets.
 
----
-
-### Task 11: Final repository quality and provenance audit
-
-**Files:**
-- All tracked files
-
-**Interfaces:**
-- Consumes: completed repository and public release.
-- Produces: final publication verdict with no hidden secret/provenance/documentation gaps.
-
-- [ ] **Step 1: Verify required top-level documentation exists**
+- [ ] **Step 8: Download the public release and verify checksums one final time**
 
 ```bash
-for f in \
-  README.md LICENSE CHANGELOG.md CONTRIBUTING.md SECURITY.md \
-  docs/ARCHITECTURE.md docs/INSTALLATION.md docs/COMPATIBILITY.md \
-  docs/UPSTREAM.md docs/VERIFICATION.md; do
-  test -s "$f" || { echo "MISSING=$f"; exit 1; }
-done
-```
-
-- [ ] **Step 2: Scan for placeholders and private signing artifacts**
-
-```bash
-! grep -RniE '\b(TODO|TBD|FIXME)\b' README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md docs
-! git ls-files | grep -Ei '(\.p12$|\.jks$|\.keystore$|NOWBAR-RECOVERY|local\.properties$)'
-```
-
-- [ ] **Step 3: Verify public attribution and non-affiliation**
-
-```bash
-grep -qi 'Kieron Quinn' README.md
-grep -qi 'not affiliated' README.md
-grep -qi 'GPLv3' README.md
-grep -qi 'Jorgeprdz' docs/UPSTREAM.md
-```
-
-- [ ] **Step 4: Verify the implementation still uses public promoted notification APIs and no Samsung private API dependency was introduced**
-
-```bash
-grep -R "setRequestPromotedOngoing" -n app/src/main
-grep -R "canPostPromotedNotifications" -n app/src/main
-! grep -RniE 'com\.samsung\.android\..*(systemui|nowbar)|Sem.*NowBar' app/src/main
-```
-
-Review any Samsung namespace match manually rather than deleting legitimate unrelated upstream code blindly.
-
-- [ ] **Step 5: Verify the release assets against published checksums one final time**
-
-```bash
+rm -rf /tmp/ambient-oneui-v0.1.0
+mkdir -p /tmp/ambient-oneui-v0.1.0
 gh release download v0.1.0 \
   --repo Jorgeprdz/AmbientMusic-OneUI-LiveNotifications \
   --dir /tmp/ambient-oneui-v0.1.0
@@ -1001,16 +904,17 @@ cd /tmp/ambient-oneui-v0.1.0
 sha256sum -c SHA256SUMS.txt
 ```
 
-Expected: both APKs report `OK`.
+Expected: both APKs `OK`.
 
-- [ ] **Step 6: Record the final verdict**
+- [ ] **Step 9: Final completion verdict**
 
-A successful completion report must include:
+Only after the corresponding evidence exists, report:
 
 ```text
 REPOSITORY=PASS
 GPL_ATTRIBUTION=PASS
 CI=PASS
+PAM_SOURCE_HASH=PASS
 PAIRED_SIGNER=PASS
 PACKAGE_IDS=PASS
 S25_RECOGNITION=PASS
@@ -1018,5 +922,3 @@ S25_NOW_BAR=PASS
 SECRET_SCAN=PASS
 RELEASE_V0_1_0=PASS
 ```
-
-Do not report any line as PASS without its corresponding evidence from the preceding tasks.
