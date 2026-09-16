@@ -14,7 +14,6 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.kieronquinn.app.ambientmusicmod.R
-import com.kieronquinn.app.ambientmusicmod.ui.activities.MainActivity
 
 /**
  * Developer-only M0 probe for Android promoted ongoing notifications.
@@ -58,7 +57,7 @@ internal class NowPlayingSurfaceProbe(private val context: Context) {
         val contentIntent = PendingIntent.getActivity(
             context,
             0,
-            Intent(context, MainActivity::class.java).apply {
+            Intent(context, NowPlayingSurfaceProbeActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
