@@ -15,8 +15,8 @@ apply plugin: 'com.google.android.gms.oss-licenses-plugin'
 String DEFAULT_MANIFEST = "290:https://storage.googleapis.com/music-iq-db/updatable_ytm_db/20240901-030029/manifest.json"
 String DEFAULT_MANIFEST_V3 = "3099:https://storage.googleapis.com/music-iq-db/updatable_db_v3/20240901-030029/manifest.json"
 
-def tagName = '2.4'
-def version = 240
+def tagName = 'v0.1.0'
+def version = 241
 
 def getKeystoreProperties() {
     def properties = new Properties()
@@ -143,7 +143,7 @@ dependencies {
     implementation 'com.airbnb.android:lottie:6.4.0'
 
     //Used for chip layouts
-    implementation 'com.google.android.flexbox:flexbox:3.0.0'
+    implementation "com.google.android.flexbox:flexbox:3.0.0"
 
     //Audio visualisation during playback
     implementation 'com.github.alxrm:audiowave-progressbar:0.9.2'
@@ -192,7 +192,7 @@ dependencies {
     implementation 'me.saket:better-link-movement-method:2.2.0'
 
     //Autostarter provides some OEM battery checks + starting settings for disabling them
-    implementation 'com.github.judemanutd:autostarter:1.1.0'
+    implementation 'com.github.judemanutd:autostarter:1.1.6'
 
     //Colour Picker for overlay text
     implementation 'com.github.duanhong169:colorpicker:1.1.6'
