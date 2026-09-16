@@ -16,7 +16,7 @@ import androidx.core.content.ContextCompat
 import com.kieronquinn.app.ambientmusicmod.R
 
 /**
- * Developer-only M0 probe for Android promoted ongoing notifications.
+ * Developer-only M0-B probe for Android promoted ongoing notifications.
  *
  * This intentionally has no Samsung-private API, MediaSession, Shizuku dependency,
  * notification listener, custom RemoteViews or recognition-engine dependency.
@@ -24,7 +24,9 @@ import com.kieronquinn.app.ambientmusicmod.R
 internal class NowPlayingSurfaceProbe(private val context: Context) {
 
     companion object {
-        const val CHANNEL_ID = "now_playing_surface_m0_v1"
+        // New channel id is intentional: Android does not allow an existing channel's
+        // importance to be raised after creation.
+        const val CHANNEL_ID = "now_playing_surface_m0b_v1"
         const val NOTIFICATION_ID = 0x4D30
         const val TIMEOUT_MILLIS = 60_000L
         private const val PROMOTED_PERMISSION = "android.permission.POST_PROMOTED_NOTIFICATIONS"
@@ -40,10 +42,10 @@ internal class NowPlayingSurfaceProbe(private val context: Context) {
         notificationManager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
-                "M0 Live Update probe",
-                NotificationManager.IMPORTANCE_DEFAULT
+                "M0-B Live Update probe",
+                NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Finite public-API probe for promoted ongoing notifications"
+                description = "Finite public-API probe for Samsung live-notification eligibility"
                 setSound(null, null)
                 enableVibration(false)
                 enableLights(false)
@@ -64,16 +66,24 @@ internal class NowPlayingSurfaceProbe(private val context: Context) {
         )
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_fab_recognise)
-            .setContentTitle("M0 Live Update probe")
+            .setContentTitle("M0-B Live Update probe")
             .setContentText("Ambient Music Mod — public Android API")
+            .setSubText("Ambient Music Mod")
             .setContentIntent(contentIntent)
             .setCategory(Notification.CATEGORY_STATUS)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setSilent(true)
             .setOngoing(true)
             .setAutoCancel(false)
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
             .setShortCriticalText("")
+            .setStyle(
+                NotificationCompat.BigTextStyle()
+                    .setBigContentTitle("M0-B Live Update probe")
+                    .bigText("Ambient Music Mod — public Android API")
+            )
             .setTimeoutAfter(TIMEOUT_MILLIS)
             .setRequestPromotedOngoing(true)
             .build()
@@ -181,7 +191,7 @@ internal data class ProbeSnapshot(
     val systemAssignedPromotedOngoing: Boolean
 ) {
     fun asText(): String = buildString {
-        appendLine("===== AMBIENT MUSIC MOD — M0 LIVE UPDATE PROBE =====")
+        appendLine("===== AMBIENT MUSIC MOD — M0-B LIVE UPDATE PROBE =====")
         appendLine("device=$manufacturer $model")
         appendLine("android=$release sdk=$sdkInt")
         appendLine("POST_NOTIFICATIONS=$postNotificationsGranted")
@@ -199,14 +209,14 @@ internal data class ProbeSnapshot(
         appendLine()
         appendLine(
             when {
-                sdkInt < 36 -> "M0=UNSUPPORTED_PLATFORM_API"
-                !postNotificationsGranted -> "M0=POST_NOTIFICATIONS_PERMISSION_REQUIRED"
-                !notificationsEnabled -> "M0=APP_NOTIFICATIONS_DISABLED"
-                channelBlocked -> "M0=CHANNEL_BLOCKED"
-                !promotableCharacteristics -> "M0=STRUCTURAL_FAIL"
-                !canPostPromotedNotifications -> "M0=PROMOTION_DISABLED_OR_OEM_INELIGIBLE"
-                !systemAssignedPromotedOngoing -> "M0=POSTED_AWAITING_OR_NOT_PROMOTED"
-                else -> "M0=PLATFORM_PROMOTED_VISUAL_NOW_BAR_CHECK_REQUIRED"
+                sdkInt < 36 -> "M0B=UNSUPPORTED_PLATFORM_API"
+                !postNotificationsGranted -> "M0B=POST_NOTIFICATIONS_PERMISSION_REQUIRED"
+                !notificationsEnabled -> "M0B=APP_NOTIFICATIONS_DISABLED"
+                channelBlocked -> "M0B=CHANNEL_BLOCKED"
+                !promotableCharacteristics -> "M0B=STRUCTURAL_FAIL"
+                !canPostPromotedNotifications -> "M0B=PROMOTION_DISABLED_OR_OEM_INELIGIBLE"
+                !systemAssignedPromotedOngoing -> "M0B=POSTED_AWAITING_OR_NOT_PROMOTED"
+                else -> "M0B=PLATFORM_PROMOTED_VISUAL_NOW_BAR_CHECK_REQUIRED"
             }
         )
         appendLine("A real Samsung Now Bar PASS still requires visual verification.")
