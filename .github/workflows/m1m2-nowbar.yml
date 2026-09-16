@@ -68,16 +68,21 @@ jobs:
           chmod +x ./gradlew
           ./gradlew :app:testDebugUnitTest --stacktrace
 
-      - name: Build app
+      - name: Compile publisher instrumentation tests
         shell: bash
         run: |
-          ./gradlew :app:assembleDebug --stacktrace
+          ./gradlew :app:assembleDebugAndroidTest --stacktrace
+
+      - name: Build production-source APK
+        shell: bash
+        run: |
+          ./gradlew :app:assembleRelease --stacktrace
 
       - name: Hash APK
         shell: bash
         run: |
           set -euo pipefail
-          APK="$(find app/build/outputs/apk/debug -maxdepth 1 -type f -name '*.apk' | head -n 1)"
+          APK="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | head -n 1)"
           test -n "$APK"
           sha256sum "$APK" | tee M1M2-APK-SHA256.txt
           echo "APK_PATH=$APK" >> "$GITHUB_ENV"
