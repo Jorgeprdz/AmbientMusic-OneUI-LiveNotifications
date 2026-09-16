@@ -37,7 +37,7 @@ class AndroidLiveUpdateNowPlayingSurfacePublisherTest {
 
         assertEquals(NotificationManager.IMPORTANCE_HIGH, channel.importance)
         assertTrue(NotificationCompat.isRequestPromotedOngoing(notification))
-        assertTrue(notification.flags and Notification.FLAG_ONGOING_EVENT != 0)
+        assertTrue((notification.flags and Notification.FLAG_ONGOING_EVENT) != 0)
         assertEquals(Notification.CATEGORY_STATUS, notification.category)
         assertEquals(Notification.VISIBILITY_PUBLIC, notification.visibility)
         assertEquals(NotificationCompat.PRIORITY_HIGH, notification.priority)
