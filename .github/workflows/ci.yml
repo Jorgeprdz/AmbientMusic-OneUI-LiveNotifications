@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-\${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -68,17 +68,16 @@ jobs:
           keyPassword=ci-only-password
           EOF
 
-      - name: Smoke-test Android 16 PAM packaging
+      - name: Smoke-test Android 16 PAM binary-manifest packaging
         shell: bash
         run: |
           set -euo pipefail
 
           PAM="$RUNNER_TEMP/PixelAmbientMusic-1.3.5-official.apk"
-          DECODED="$RUNNER_TEMP/pam-decoded"
+          PATCH_DIR="$RUNNER_TEMP/pam-manifest-patch"
           UNSIGNED="$RUNNER_TEMP/pam-patched-unaligned.apk"
           ALIGNED="$RUNNER_TEMP/pam-patched-aligned.apk"
           SIGNED="$RUNNER_TEMP/pam-patched-signed.apk"
-          APKTOOL="$RUNNER_TEMP/apktool.jar"
           BUILD_TOOLS="$ANDROID_SDK_ROOT/build-tools/35.0.0"
 
           curl -fL --retry 3 \
@@ -87,15 +86,26 @@ jobs:
           echo '11e3f12439d1b00e93174c6d2d9d6ff9000daec4e0bd03711d52cb25310223c1  '"$PAM" \
             | sha256sum -c -
 
-          curl -fL --retry 3 \
-            'https://github.com/iBotPeaches/Apktool/releases/download/v3.0.3/apktool_3.0.3.jar' \
-            -o "$APKTOOL"
-          echo 'dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423  '"$APKTOOL" \
-            | sha256sum -c -
+          mkdir -p "$PATCH_DIR"
+          unzip -p "$PAM" AndroidManifest.xml > "$PATCH_DIR/AndroidManifest.xml"
+          python3 scripts/patch_pam_manifest.py "$PATCH_DIR/AndroidManifest.xml"
+          python3 scripts/patch_pam_manifest.py --verify "$PATCH_DIR/AndroidManifest.xml"
 
-          java -jar "$APKTOOL" d -f -r -s "$PAM" -o "$DECODED"
-          python3 scripts/patch_pam_manifest.py "$DECODED/AndroidManifest.xml"
-          java -jar "$APKTOOL" b "$DECODED" -o "$UNSIGNED"
+          cp "$PAM" "$UNSIGNED"
+          (
+            cd "$PATCH_DIR"
+            zip -q -0 "$UNSIGNED" AndroidManifest.xml
+          )
+
+          test "$(unzip -Z1 "$UNSIGNED" | grep -cx 'AndroidManifest.xml')" -eq 1
+          unzip -p "$UNSIGNED" AndroidManifest.xml > "$RUNNER_TEMP/manifest-after-zip.bin"
+          python3 scripts/patch_pam_manifest.py --verify "$RUNNER_TEMP/manifest-after-zip.bin"
+
+          "$BUILD_TOOLS/aapt2" dump xmltree \
+            --file AndroidManifest.xml "$UNSIGNED" \
+            > "$RUNNER_TEMP/pam-manifest-tree.txt"
+          grep -Fq 'pageSizeCompat' "$RUNNER_TEMP/pam-manifest-tree.txt"
+          grep -Fq 'debuggable' "$RUNNER_TEMP/pam-manifest-tree.txt"
 
           "$BUILD_TOOLS/zipalign" -f -P 16 -v 4 "$UNSIGNED" "$ALIGNED"
           "$BUILD_TOOLS/apksigner" sign \
@@ -110,10 +120,13 @@ jobs:
           "$BUILD_TOOLS/apksigner" verify --verbose "$SIGNED"
           "$BUILD_TOOLS/zipalign" -c -P 16 -v 4 "$SIGNED"
 
-          VERIFY="$RUNNER_TEMP/pam-verify"
-          java -jar "$APKTOOL" d -f -s "$SIGNED" -o "$VERIFY" >/dev/null
-          grep -Fq 'android:debuggable="false"' "$VERIFY/AndroidManifest.xml"
-          grep -Fq 'android:pageSizeCompat="enabled"' "$VERIFY/AndroidManifest.xml"
+          unzip -p "$SIGNED" AndroidManifest.xml > "$RUNNER_TEMP/manifest-signed.bin"
+          python3 scripts/patch_pam_manifest.py --verify "$RUNNER_TEMP/manifest-signed.bin"
+          "$BUILD_TOOLS/aapt2" dump xmltree \
+            --file AndroidManifest.xml "$SIGNED" \
+            > "$RUNNER_TEMP/pam-manifest-signed-tree.txt"
+          grep -Fq 'pageSizeCompat' "$RUNNER_TEMP/pam-manifest-signed-tree.txt"
+          grep -Fq 'debuggable' "$RUNNER_TEMP/pam-manifest-signed-tree.txt"
 
           python3 scripts/report_elf_alignment.py "$SIGNED"
 
@@ -130,4 +143,3 @@ jobs:
       - name: Compile release sources
         shell: bash
         run: ./gradlew :app:compileReleaseKotlin --stacktrace
-
