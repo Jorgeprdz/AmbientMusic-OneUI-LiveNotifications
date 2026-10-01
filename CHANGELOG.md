@@ -7,7 +7,7 @@ All notable derivative-specific changes are documented here.
 ### Fixed
 
 - Pixel Ambient Music paired release is rebuilt with `android:debuggable="false"`.
-- Explicit Android 16 `android:pageSizeCompat="true"` opt-in prevents the compatibility warning for inherited 4 KiB ELF libraries.
+- Explicit Android 16 `android:pageSizeCompat="enabled"` opt-in prevents the compatibility warning for inherited 4 KiB ELF libraries.
 - Pixel Ambient Music APK packaging is aligned and verified with 16 KiB native-library ZIP boundaries.
 
 ### Changed
