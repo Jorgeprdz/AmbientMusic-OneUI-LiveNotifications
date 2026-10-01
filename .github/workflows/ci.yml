@@ -113,7 +113,7 @@ jobs:
           VERIFY="$RUNNER_TEMP/pam-verify"
           java -jar "$APKTOOL" d -f -s "$SIGNED" -o "$VERIFY" >/dev/null
           grep -Fq 'android:debuggable="false"' "$VERIFY/AndroidManifest.xml"
-          grep -Fq 'android:pageSizeCompat="true"' "$VERIFY/AndroidManifest.xml"
+          grep -Fq 'android:pageSizeCompat="enabled"' "$VERIFY/AndroidManifest.xml"
 
           python3 scripts/report_elf_alignment.py "$SIGNED"
 
