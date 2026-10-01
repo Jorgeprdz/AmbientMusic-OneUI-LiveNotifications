@@ -68,20 +68,6 @@ jobs:
           keyPassword=ci-only-password
           EOF
 
-      - name: Unit tests
-        shell: bash
-        run: |
-          chmod +x ./gradlew
-          ./gradlew :app:testDebugUnitTest --stacktrace
-
-      - name: Compile instrumentation tests
-        shell: bash
-        run: ./gradlew :app:assembleDebugAndroidTest --stacktrace
-
-      - name: Compile release sources
-        shell: bash
-        run: ./gradlew :app:compileReleaseKotlin --stacktrace
-
       - name: Smoke-test Android 16 PAM packaging
         shell: bash
         run: |
@@ -130,3 +116,18 @@ jobs:
           grep -Fq 'android:pageSizeCompat="true"' "$VERIFY/AndroidManifest.xml"
 
           python3 scripts/report_elf_alignment.py "$SIGNED"
+
+      - name: Unit tests
+        shell: bash
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :app:testDebugUnitTest --stacktrace
+
+      - name: Compile instrumentation tests
+        shell: bash
+        run: ./gradlew :app:assembleDebugAndroidTest --stacktrace
+
+      - name: Compile release sources
+        shell: bash
+        run: ./gradlew :app:compileReleaseKotlin --stacktrace
+
