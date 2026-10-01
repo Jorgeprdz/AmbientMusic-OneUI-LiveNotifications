@@ -7,6 +7,14 @@ on:
       - main
     paths:
       - .github/release-trigger
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/paired-release.yml
+      - scripts/patch_pam_manifest.py
+      - app/build.gradle
+      - .github/release-trigger
 
 permissions:
   contents: write
@@ -25,6 +33,8 @@ jobs:
       NOWBAR_KEY_ALIAS: ${{ secrets.NOWBAR_KEY_ALIAS }}
       NOWBAR_CERT_SHA256: ${{ secrets.NOWBAR_CERT_SHA256 }}
       PAM_135_SHA256: 11e3f12439d1b00e93174c6d2d9d6ff9000daec4e0bd03711d52cb25310223c1
+      APKTOOL_VERSION: 3.0.3
+      APKTOOL_SHA256: dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423
 
     steps:
       - name: Checkout
@@ -158,6 +168,31 @@ jobs:
           echo "$PAM_135_SHA256  pair/PixelAmbientMusic-1.3.5-official.apk" \
             | sha256sum -c -
 
+      - name: Patch PAM for Android 16 compatibility mode
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APKTOOL="$RUNNER_TEMP/apktool.jar"
+          curl -fL --retry 3 \
+            "https://github.com/iBotPeaches/Apktool/releases/download/v$APKTOOL_VERSION/apktool_$APKTOOL_VERSION.jar" \
+            -o "$APKTOOL"
+          echo "$APKTOOL_SHA256  $APKTOOL" | sha256sum -c -
+
+          rm -rf pair/pam-decoded
+          java -jar "$APKTOOL" d -f \
+            pair/PixelAmbientMusic-1.3.5-official.apk \
+            -o pair/pam-decoded
+
+          python3 scripts/patch_pam_manifest.py pair/pam-decoded/AndroidManifest.xml
+
+          java -jar "$APKTOOL" b \
+            pair/pam-decoded \
+            -o pair/PixelAmbientMusic-1.3.5-patched-unaligned.apk
+
+          test -s pair/PixelAmbientMusic-1.3.5-patched-unaligned.apk
+          echo "APKTOOL=$APKTOOL" >> "$GITHUB_ENV"
+
       - name: Build and verify paired release files
         shell: bash
         run: |
@@ -172,8 +207,8 @@ jobs:
           test -n "$AMM_SOURCE"
           cp "$AMM_SOURCE" pair/AmbientMusicMod-OneUI.apk
 
-          "$ZIPALIGN" -f -p 4 \
-            pair/PixelAmbientMusic-1.3.5-official.apk \
+          "$ZIPALIGN" -f -P 16 -v 4 \
+            pair/PixelAmbientMusic-1.3.5-patched-unaligned.apk \
             pair/PixelAmbientMusic-1.3.5-aligned.apk
 
           "$APK_SIGNER" sign \
@@ -187,6 +222,186 @@ jobs:
 
           "$APK_SIGNER" verify --verbose pair/AmbientMusicMod-OneUI.apk
           "$APK_SIGNER" verify --verbose pair/PixelAmbientMusic-1.3.5-paired.apk
+          "$ZIPALIGN" -c -P 16 -v 4 pair/PixelAmbientMusic-1.3.5-paired.apk
+
+          rm -rf pair/pam-verify
+          java -jar "$APKTOOL" d -f -s \
+            pair/PixelAmbientMusic-1.3.5-paired.apk \
+            -o pair/pam-verify >/dev/null
+
+          grep -Fq 'android:debuggable="false"' pair/pam-verify/AndroidManifest.xml
+          grep -Fq 'android:pageSizeCompat="true"' pair/pam-verify/AndroidManifest.xml
+
+          # The ASI-derived PAM 1.3.5 payload still contains legacy prebuilt
+          # native libraries. Report 4 KiB ELF LOAD alignment explicitly;
+          # Android 16 pageSizeCompat is the supported bridge for these blobs.
+          rm -rf pair/elf-report
+          mkdir -p pair/elf-report
+          unzip -q pair/PixelAmbientMusic-1.3.5-paired.apk 'lib/arm64-v8a/*.so' \
+            -d pair/elf-report || true
+          LEGACY_4K=0
+          if [ -d pair/elf-report/lib/arm64-v8a ]; then
+            while IFS= read -r so; do
+              if readelf -lW "$so" \
+                | grep -Eq '^[[:space:]]*LOAD[[:space:]].*[[:space:]]0x1000
+          AMM_CERT="$($APK_SIGNER verify --print-certs pair/AmbientMusicMod-OneUI.apk \
+            | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' \
+            | head -n1 | tr '[:upper:]' '[:lower:]')"
+          PAM_CERT="$($APK_SIGNER verify --print-certs pair/PixelAmbientMusic-1.3.5-paired.apk \
+            | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' \
+            | head -n1 | tr '[:upper:]' '[:lower:]')"
+
+          test -n "$AMM_CERT"
+          test -n "$PAM_CERT"
+          test "$AMM_CERT" = "$PAM_CERT"
+          test "$AMM_CERT" = "$EXPECTED_CERT_SHA256"
+
+          AMM_PACKAGE="$($AAPT dump badging pair/AmbientMusicMod-OneUI.apk \
+            | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -n1)"
+          PAM_PACKAGE="$($AAPT dump badging pair/PixelAmbientMusic-1.3.5-paired.apk \
+            | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -n1)"
+          AMM_VERSION_CODE="$($AAPT dump badging pair/AmbientMusicMod-OneUI.apk \
+            | sed -n "s/^package: .*versionCode='\([^']*\)'.*/\1/p" | head -n1)"
+          AMM_VERSION_NAME="$($AAPT dump badging pair/AmbientMusicMod-OneUI.apk \
+            | sed -n "s/^package: .*versionName='\([^']*\)'.*/\1/p" | head -n1)"
+
+          test "$AMM_PACKAGE" = 'com.kieronquinn.app.ambientmusicmod'
+          test "$PAM_PACKAGE" = 'com.kieronquinn.app.pixelambientmusic'
+          test "$AMM_VERSION_CODE" = "$VERSION_CODE"
+          test "$AMM_VERSION_NAME" = "$RELEASE_TAG"
+
+          rm -rf \
+            pair/PixelAmbientMusic-1.3.5-official.apk \
+            pair/PixelAmbientMusic-1.3.5-patched-unaligned.apk \
+            pair/PixelAmbientMusic-1.3.5-aligned.apk \
+            pair/pam-decoded \
+            pair/pam-verify \
+            pair/elf-report
+
+          cd pair
+          sha256sum \
+            AmbientMusicMod-OneUI.apk \
+            PixelAmbientMusic-1.3.5-paired.apk \
+            > SHA256SUMS.txt
+
+          test "$(wc -l < SHA256SUMS.txt)" -eq 2
+          sha256sum -c SHA256SUMS.txt
+
+      - name: Summarize Android 16 PAM compatibility
+        shell: bash
+        run: |
+          {
+            echo "### Android 16 Pixel Ambient Music compatibility"
+            echo "- android:debuggable=false: verified"
+            echo "- android:pageSizeCompat=true: verified"
+            echo "- APK native-library ZIP alignment: 16 KiB verified"
+            echo "- Legacy 4 KiB arm64 ELF libraries inherited from ASI: ${PAM_LEGACY_4K_ELF_COUNT:-0}"
+            echo "- Legacy ELF libraries run through Android 16's official page-size compatibility mode."
+            if [ -s "$RUNNER_TEMP/pam-4k-elf.txt" ]; then
+              echo
+              cat "$RUNNER_TEMP/pam-4k-elf.txt"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload verified paired bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: AmbientMusic-OneUI-Paired
+          path: |
+            pair/AmbientMusicMod-OneUI.apk
+            pair/PixelAmbientMusic-1.3.5-paired.apk
+            pair/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish verified GitHub prerelease
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          NOTES="$RUNNER_TEMP/release-notes.md"
+          {
+            printf '## Ambient Music for One UI — %s Experimental\n\n' "$RELEASE_TAG"
+            cat <<'EOF'
+          Experimental Samsung One UI derivative of Ambient Music Mod.
+
+          ### Highlights
+          - Recognised songs can surface in Samsung's real Now Bar through Android 16 promoted Live Update notifications.
+          - Promoted Now Bar publishing is always enabled in this experimental derivative.
+          - Includes a paired Pixel Ambient Music 1.3.5 APK signed with the same release identity required by the upstream signature-permission architecture.
+          - Android 16 compatibility hardening: PAM is no longer marked debuggable, explicitly opts into android:pageSizeCompat, and is ZIP-aligned for 16 KiB native-library boundaries.
+          - PAM still contains legacy 4 KiB ELF libraries inherited from the Android System Intelligence base; Android 16 runs those binaries through its official page-size compatibility mode.
+
+          ### Verified device
+          - Samsung Galaxy S25 (SM-S931B), Android 16 / One UI 8.x.
+
+          ### Install
+          Install both APKs from this release together. `SHA256SUMS.txt` contains the public file hashes.
+
+          Unofficial community project. Not affiliated with Samsung, Google, or Kieron Quinn.
+          EOF
+          } > "$NOTES"
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" \
+              pair/AmbientMusicMod-OneUI.apk \
+              pair/PixelAmbientMusic-1.3.5-paired.apk \
+              pair/SHA256SUMS.txt \
+              --clobber
+            gh release edit "$RELEASE_TAG" \
+              --title "$RELEASE_TAG Experimental" \
+              --notes-file "$NOTES" \
+              --prerelease
+          else
+            gh release create "$RELEASE_TAG" \
+              pair/AmbientMusicMod-OneUI.apk \
+              pair/PixelAmbientMusic-1.3.5-paired.apk \
+              pair/SHA256SUMS.txt \
+              --target "$GITHUB_SHA" \
+              --title "$RELEASE_TAG Experimental" \
+              --notes-file "$NOTES" \
+              --prerelease
+          fi
+
+          test "$(gh release view "$RELEASE_TAG" --json tagName --jq '.tagName')" = "$RELEASE_TAG"
+          test "$(gh release view "$RELEASE_TAG" --json isPrerelease --jq '.isPrerelease')" = "true"
+
+          mapfile -t RELEASE_ASSETS < <(
+            gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | sort
+          )
+          EXPECTED_ASSETS=(
+            AmbientMusicMod-OneUI.apk
+            PixelAmbientMusic-1.3.5-paired.apk
+            SHA256SUMS.txt
+          )
+          mapfile -t EXPECTED_SORTED < <(printf '%s\n' "${EXPECTED_ASSETS[@]}" | sort)
+
+          test "${#RELEASE_ASSETS[@]}" -eq 3
+          test "$(printf '%s\n' "${RELEASE_ASSETS[@]}")" = \
+               "$(printf '%s\n' "${EXPECTED_SORTED[@]}")"
+
+          {
+            echo "### Public prerelease"
+            echo "- https://github.com/${GITHUB_REPOSITORY}/releases/tag/$RELEASE_TAG"
+            echo "- Assets: verified paired APKs + SHA256SUMS.txt"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Note non-main release behavior
+        if: github.ref != 'refs/heads/main'
+        shell: bash
+        run: |
+          echo "Verified bundle built successfully. Public GitHub Release publication is restricted to main." \
+            >> "$GITHUB_STEP_SUMMARY"
+; then
+                echo "Legacy 4 KiB ELF: ${so#pair/elf-report/}" >> "$RUNNER_TEMP/pam-4k-elf.txt"
+                LEGACY_4K=$((LEGACY_4K + 1))
+              fi
+            done < <(find pair/elf-report/lib/arm64-v8a -type f -name '*.so' | sort)
+          fi
+          echo "PAM_LEGACY_4K_ELF_COUNT=$LEGACY_4K" >> "$GITHUB_ENV"
 
           AMM_CERT="$($APK_SIGNER verify --print-certs pair/AmbientMusicMod-OneUI.apk \
             | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' \
