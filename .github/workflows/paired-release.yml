@@ -231,7 +231,7 @@ jobs:
             -o pair/pam-verify >/dev/null
 
           grep -Fq 'android:debuggable="false"' pair/pam-verify/AndroidManifest.xml
-          grep -Fq 'android:pageSizeCompat="true"' pair/pam-verify/AndroidManifest.xml
+          grep -Fq 'android:pageSizeCompat="enabled"' pair/pam-verify/AndroidManifest.xml
 
           # Report every arm64 native library without pretending the
           # prebuilt ASI blobs are natively 16 KiB compatible.
@@ -288,7 +288,7 @@ jobs:
           {
             echo "### Android 16 Pixel Ambient Music compatibility"
             echo "- android:debuggable=false: verified"
-            echo "- android:pageSizeCompat=true: verified"
+            echo "- android:pageSizeCompat=enabled: verified"
             echo "- APK native-library ZIP alignment: 16 KiB verified"
             echo "- Legacy 4 KiB arm64 ELF libraries inherited from ASI: ${PAM_LEGACY_4K_ELF_COUNT:-0}"
             echo "- Legacy ELF libraries run through Android 16's official page-size compatibility mode."
