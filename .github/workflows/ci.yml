@@ -93,7 +93,7 @@ jobs:
           echo 'dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423  '"$APKTOOL" \
             | sha256sum -c -
 
-          java -jar "$APKTOOL" d -f "$PAM" -o "$DECODED"
+          java -jar "$APKTOOL" d -f -r -s "$PAM" -o "$DECODED"
           python3 scripts/patch_pam_manifest.py "$DECODED/AndroidManifest.xml"
           java -jar "$APKTOOL" b "$DECODED" -o "$UNSIGNED"
 
