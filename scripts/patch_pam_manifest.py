@@ -36,19 +36,19 @@ def main() -> int:
     text = manifest.read_text(encoding="utf-8")
 
     text = set_android_attr(text, "debuggable", "false")
-    text = set_android_attr(text, "pageSizeCompat", "true")
+    text = set_android_attr(text, "pageSizeCompat", "enabled")
 
     manifest.write_text(text, encoding="utf-8")
 
     patched = manifest.read_text(encoding="utf-8")
     for expected in (
         'android:debuggable="false"',
-        'android:pageSizeCompat="true"',
+        'android:pageSizeCompat="enabled"',
     ):
         if expected not in patched:
             raise RuntimeError(f"manifest patch verification failed: {expected}")
 
-    print("Patched manifest: debuggable=false, pageSizeCompat=true")
+    print("Patched manifest: debuggable=false, pageSizeCompat=enabled")
     return 0
 
 
