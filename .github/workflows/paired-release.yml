@@ -13,6 +13,7 @@ on:
     paths:
       - .github/workflows/paired-release.yml
       - scripts/patch_pam_manifest.py
+      - scripts/report_elf_alignment.py
       - app/build.gradle
       - .github/release-trigger
 
@@ -232,18 +233,13 @@ jobs:
           grep -Fq 'android:debuggable="false"' pair/pam-verify/AndroidManifest.xml
           grep -Fq 'android:pageSizeCompat="true"' pair/pam-verify/AndroidManifest.xml
 
-          # The ASI-derived PAM 1.3.5 payload still contains legacy prebuilt
-          # native libraries. Report 4 KiB ELF LOAD alignment explicitly;
-          # Android 16 pageSizeCompat is the supported bridge for these blobs.
-          rm -rf pair/elf-report
-          mkdir -p pair/elf-report
-          unzip -q pair/PixelAmbientMusic-1.3.5-paired.apk 'lib/arm64-v8a/*.so' \
-            -d pair/elf-report || true
-          LEGACY_4K=0
-          if [ -d pair/elf-report/lib/arm64-v8a ]; then
-            while IFS= read -r so; do
-              if readelf -lW "$so" \
-                | grep -Eq '^[[:space:]]*LOAD[[:space:]].*[[:space:]]0x1000
+          # Report every arm64 native library without pretending the
+          # prebuilt ASI blobs are natively 16 KiB compatible.
+          python3 scripts/report_elf_alignment.py \
+            pair/PixelAmbientMusic-1.3.5-paired.apk \
+            --report "$RUNNER_TEMP/pam-elf-report.txt" \
+            --github-env "$GITHUB_ENV"
+
           AMM_CERT="$($APK_SIGNER verify --print-certs pair/AmbientMusicMod-OneUI.apk \
             | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' \
             | head -n1 | tr '[:upper:]' '[:lower:]')"
@@ -275,8 +271,7 @@ jobs:
             pair/PixelAmbientMusic-1.3.5-patched-unaligned.apk \
             pair/PixelAmbientMusic-1.3.5-aligned.apk \
             pair/pam-decoded \
-            pair/pam-verify \
-            pair/elf-report
+            pair/pam-verify
 
           cd pair
           sha256sum \
@@ -297,9 +292,9 @@ jobs:
             echo "- APK native-library ZIP alignment: 16 KiB verified"
             echo "- Legacy 4 KiB arm64 ELF libraries inherited from ASI: ${PAM_LEGACY_4K_ELF_COUNT:-0}"
             echo "- Legacy ELF libraries run through Android 16's official page-size compatibility mode."
-            if [ -s "$RUNNER_TEMP/pam-4k-elf.txt" ]; then
+            if [ -s "$RUNNER_TEMP/pam-elf-report.txt" ]; then
               echo
-              cat "$RUNNER_TEMP/pam-4k-elf.txt"
+              cat "$RUNNER_TEMP/pam-elf-report.txt"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
