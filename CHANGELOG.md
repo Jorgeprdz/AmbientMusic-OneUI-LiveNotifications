@@ -2,6 +2,25 @@
 
 All notable derivative-specific changes are documented here.
 
+## [v0.1.1] - 2026-10-01
+
+### Fixed
+
+- Pixel Ambient Music paired release is rebuilt with `android:debuggable="false"`.
+- Explicit Android 16 `android:pageSizeCompat="enabled"` opt-in prevents the compatibility warning for inherited 4 KiB ELF libraries.
+- Pixel Ambient Music APK packaging is aligned and verified with 16 KiB native-library ZIP boundaries.
+
+### Changed
+
+- Paired-release CI now patches and re-verifies the Pixel Ambient Music manifest before signing.
+- CI reports legacy 4 KiB arm64 ELF libraries inherited from the Android System Intelligence base instead of misrepresenting them as natively 16 KiB compatible.
+- Android release identity is `versionName v0.1.1`, `versionCode 242`.
+
+### Notes
+
+- This release uses Android 16's official page-size compatibility mode for legacy prebuilt native libraries. It does not claim native 16 KiB ELF alignment for those proprietary/prebuilt blobs.
+- Ambient Music Mod and Pixel Ambient Music remain signed with the same stable paired release identity.
+
 ## [v0.1.0] - 2026-09-16
 
 ### Added

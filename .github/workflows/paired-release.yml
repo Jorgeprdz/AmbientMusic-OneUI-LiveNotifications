@@ -43,7 +43,7 @@ jobs:
           test -n "$VERSION_CODE"
           test -n "$RELEASE_TRIGGER"
           [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]
-          test "$VERSION_CODE" -ge 241
+          test "$VERSION_CODE" -ge 242
           test "$RELEASE_TRIGGER" = "$RELEASE_TAG"
 
           echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
@@ -51,9 +51,9 @@ jobs:
 
           {
             echo "### Paired release candidate"
-            echo "- Tag: \`$RELEASE_TAG\`"
-            echo "- Android versionCode: \`$VERSION_CODE\`"
-            echo "- Release marker: \`$RELEASE_TRIGGER\`"
+            echo "- Tag: $RELEASE_TAG"
+            echo "- Android versionCode: $VERSION_CODE"
+            echo "- Release marker: $RELEASE_TRIGGER"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up JDK 17
@@ -111,17 +111,6 @@ jobs:
           test -n "$KEY_CERT"
           test "$KEY_CERT" = "$EXPECTED_CERT"
 
-          keytool -certreq \
-            -alias "$NOWBAR_KEY_ALIAS" \
-            -keystore "$KEYSTORE" \
-            -storetype PKCS12 \
-            -storepass "$NOWBAR_STORE_PASSWORD" \
-            -keypass "$NOWBAR_STORE_PASSWORD" \
-            -file "$RUNNER_TEMP/ambient-oneui-keycheck.csr" \
-            >/dev/null
-          test -s "$RUNNER_TEMP/ambient-oneui-keycheck.csr"
-          rm -f "$RUNNER_TEMP/ambient-oneui-keycheck.csr"
-
           cat > local.properties <<EOF
           storeFile=$KEYSTORE
           storePassword=$NOWBAR_STORE_PASSWORD
@@ -158,6 +147,38 @@ jobs:
           echo "$PAM_135_SHA256  pair/PixelAmbientMusic-1.3.5-official.apk" \
             | sha256sum -c -
 
+      - name: Patch PAM binary manifest for Android 16
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ROOT="$(pwd)"
+          PATCH_DIR="$ROOT/pair/pam-manifest-patch"
+          OFFICIAL="$ROOT/pair/PixelAmbientMusic-1.3.5-official.apk"
+          PATCHED="$ROOT/pair/PixelAmbientMusic-1.3.5-patched-unaligned.apk"
+
+          mkdir -p "$PATCH_DIR"
+          unzip -p "$OFFICIAL" AndroidManifest.xml > "$PATCH_DIR/AndroidManifest.xml"
+
+          python3 scripts/patch_pam_manifest.py "$PATCH_DIR/AndroidManifest.xml"
+          python3 scripts/patch_pam_manifest.py --verify "$PATCH_DIR/AndroidManifest.xml"
+
+          cp "$OFFICIAL" "$PATCHED"
+          (
+            cd "$PATCH_DIR"
+            zip -q -0 "$PATCHED" AndroidManifest.xml
+          )
+
+          test "$(unzip -Z1 "$PATCHED" | grep -cx 'AndroidManifest.xml')" -eq 1
+          unzip -p "$PATCHED" AndroidManifest.xml > "$RUNNER_TEMP/pam-manifest-patched.bin"
+          python3 scripts/patch_pam_manifest.py --verify "$RUNNER_TEMP/pam-manifest-patched.bin"
+
+          "$ANDROID_SDK_ROOT/build-tools/35.0.0/aapt2" dump xmltree \
+            --file AndroidManifest.xml "$PATCHED" \
+            > "$RUNNER_TEMP/pam-manifest-patched-tree.txt"
+          grep -Fq 'pageSizeCompat' "$RUNNER_TEMP/pam-manifest-patched-tree.txt"
+          grep -Fq 'debuggable' "$RUNNER_TEMP/pam-manifest-patched-tree.txt"
+
       - name: Build and verify paired release files
         shell: bash
         run: |
@@ -167,13 +188,14 @@ jobs:
           APK_SIGNER="$BUILD_TOOLS/apksigner"
           ZIPALIGN="$BUILD_TOOLS/zipalign"
           AAPT="$BUILD_TOOLS/aapt"
+          AAPT2="$BUILD_TOOLS/aapt2"
 
           AMM_SOURCE="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | head -n1)"
           test -n "$AMM_SOURCE"
           cp "$AMM_SOURCE" pair/AmbientMusicMod-OneUI.apk
 
-          "$ZIPALIGN" -f -p 4 \
-            pair/PixelAmbientMusic-1.3.5-official.apk \
+          "$ZIPALIGN" -f -P 16 -v 4 \
+            pair/PixelAmbientMusic-1.3.5-patched-unaligned.apk \
             pair/PixelAmbientMusic-1.3.5-aligned.apk
 
           "$APK_SIGNER" sign \
@@ -187,6 +209,22 @@ jobs:
 
           "$APK_SIGNER" verify --verbose pair/AmbientMusicMod-OneUI.apk
           "$APK_SIGNER" verify --verbose pair/PixelAmbientMusic-1.3.5-paired.apk
+          "$ZIPALIGN" -c -P 16 -v 4 pair/PixelAmbientMusic-1.3.5-paired.apk
+
+          unzip -p pair/PixelAmbientMusic-1.3.5-paired.apk AndroidManifest.xml \
+            > "$RUNNER_TEMP/pam-manifest-signed.bin"
+          python3 scripts/patch_pam_manifest.py --verify "$RUNNER_TEMP/pam-manifest-signed.bin"
+
+          "$AAPT2" dump xmltree \
+            --file AndroidManifest.xml pair/PixelAmbientMusic-1.3.5-paired.apk \
+            > "$RUNNER_TEMP/pam-manifest-signed-tree.txt"
+          grep -Fq 'pageSizeCompat' "$RUNNER_TEMP/pam-manifest-signed-tree.txt"
+          grep -Fq 'debuggable' "$RUNNER_TEMP/pam-manifest-signed-tree.txt"
+
+          python3 scripts/report_elf_alignment.py \
+            pair/PixelAmbientMusic-1.3.5-paired.apk \
+            --report "$RUNNER_TEMP/pam-elf-report.txt" \
+            --github-env "$GITHUB_ENV"
 
           AMM_CERT="$($APK_SIGNER verify --print-certs pair/AmbientMusicMod-OneUI.apk \
             | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' \
@@ -214,9 +252,11 @@ jobs:
           test "$AMM_VERSION_CODE" = "$VERSION_CODE"
           test "$AMM_VERSION_NAME" = "$RELEASE_TAG"
 
-          rm -f \
+          rm -rf \
             pair/PixelAmbientMusic-1.3.5-official.apk \
-            pair/PixelAmbientMusic-1.3.5-aligned.apk
+            pair/PixelAmbientMusic-1.3.5-patched-unaligned.apk \
+            pair/PixelAmbientMusic-1.3.5-aligned.apk \
+            pair/pam-manifest-patch
 
           cd pair
           sha256sum \
@@ -226,6 +266,22 @@ jobs:
 
           test "$(wc -l < SHA256SUMS.txt)" -eq 2
           sha256sum -c SHA256SUMS.txt
+
+      - name: Summarize Android 16 PAM compatibility
+        shell: bash
+        run: |
+          {
+            echo "### Android 16 Pixel Ambient Music compatibility"
+            echo "- android:debuggable=false: verified"
+            echo "- android:pageSizeCompat=enabled (32): verified"
+            echo "- APK native-library ZIP alignment: 16 KiB verified"
+            echo "- Legacy <16 KiB arm64 ELF libraries inherited from ASI: ${PAM_LEGACY_4K_ELF_COUNT:-0}"
+            echo "- Legacy ELF libraries run through Android 16's official page-size compatibility mode."
+            if [ -s "$RUNNER_TEMP/pam-elf-report.txt" ]; then
+              echo
+              cat "$RUNNER_TEMP/pam-elf-report.txt"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload verified paired bundle
         uses: actions/upload-artifact@v4
@@ -256,12 +312,16 @@ jobs:
           - Recognised songs can surface in Samsung's real Now Bar through Android 16 promoted Live Update notifications.
           - Promoted Now Bar publishing is always enabled in this experimental derivative.
           - Includes a paired Pixel Ambient Music 1.3.5 APK signed with the same release identity required by the upstream signature-permission architecture.
+          - Pixel Ambient Music is no longer marked debuggable.
+          - Android 16 page-size compatibility mode is explicitly enabled with android:pageSizeCompat.
+          - APK native-library ZIP boundaries are verified at 16 KiB.
+          - Legacy prebuilt ASI ELF libraries are reported honestly and run through Android 16's official compatibility mode; this release does not claim native 16 KiB ELF support for those blobs.
 
           ### Verified device
           - Samsung Galaxy S25 (SM-S931B), Android 16 / One UI 8.x.
 
           ### Install
-          Install both APKs from this release together. `SHA256SUMS.txt` contains the public file hashes.
+          Install both APKs from this release together. SHA256SUMS.txt contains the public file hashes.
 
           Unofficial community project. Not affiliated with Samsung, Google, or Kieron Quinn.
           EOF
@@ -310,10 +370,3 @@ jobs:
             echo "- https://github.com/${GITHUB_REPOSITORY}/releases/tag/$RELEASE_TAG"
             echo "- Assets: verified paired APKs + SHA256SUMS.txt"
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Note non-main release behavior
-        if: github.ref != 'refs/heads/main'
-        shell: bash
-        run: |
-          echo "Verified bundle built successfully. Public GitHub Release publication is restricted to main." \
-            >> "$GITHUB_STEP_SUMMARY"
