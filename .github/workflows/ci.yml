@@ -81,3 +81,52 @@ jobs:
       - name: Compile release sources
         shell: bash
         run: ./gradlew :app:compileReleaseKotlin --stacktrace
+
+      - name: Smoke-test Android 16 PAM packaging
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PAM="$RUNNER_TEMP/PixelAmbientMusic-1.3.5-official.apk"
+          DECODED="$RUNNER_TEMP/pam-decoded"
+          UNSIGNED="$RUNNER_TEMP/pam-patched-unaligned.apk"
+          ALIGNED="$RUNNER_TEMP/pam-patched-aligned.apk"
+          SIGNED="$RUNNER_TEMP/pam-patched-signed.apk"
+          APKTOOL="$RUNNER_TEMP/apktool.jar"
+          BUILD_TOOLS="$ANDROID_SDK_ROOT/build-tools/35.0.0"
+
+          curl -fL --retry 3 \
+            'https://github.com/KieronQuinn/NowPlaying/releases/download/1.3.5/NowPlaying-v1.3.5.apk' \
+            -o "$PAM"
+          echo '11e3f12439d1b00e93174c6d2d9d6ff9000daec4e0bd03711d52cb25310223c1  '"$PAM" \
+            | sha256sum -c -
+
+          curl -fL --retry 3 \
+            'https://github.com/iBotPeaches/Apktool/releases/download/v3.0.3/apktool_3.0.3.jar' \
+            -o "$APKTOOL"
+          echo 'dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423  '"$APKTOOL" \
+            | sha256sum -c -
+
+          java -jar "$APKTOOL" d -f "$PAM" -o "$DECODED"
+          python3 scripts/patch_pam_manifest.py "$DECODED/AndroidManifest.xml"
+          java -jar "$APKTOOL" b "$DECODED" -o "$UNSIGNED"
+
+          "$BUILD_TOOLS/zipalign" -f -P 16 -v 4 "$UNSIGNED" "$ALIGNED"
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks "$RUNNER_TEMP/ci-debug.p12" \
+            --ks-type PKCS12 \
+            --ks-key-alias ci \
+            --ks-pass pass:ci-only-password \
+            --key-pass pass:ci-only-password \
+            --out "$SIGNED" \
+            "$ALIGNED"
+
+          "$BUILD_TOOLS/apksigner" verify --verbose "$SIGNED"
+          "$BUILD_TOOLS/zipalign" -c -P 16 -v 4 "$SIGNED"
+
+          VERIFY="$RUNNER_TEMP/pam-verify"
+          java -jar "$APKTOOL" d -f -s "$SIGNED" -o "$VERIFY" >/dev/null
+          grep -Fq 'android:debuggable="false"' "$VERIFY/AndroidManifest.xml"
+          grep -Fq 'android:pageSizeCompat="true"' "$VERIFY/AndroidManifest.xml"
+
+          python3 scripts/report_elf_alignment.py "$SIGNED"
