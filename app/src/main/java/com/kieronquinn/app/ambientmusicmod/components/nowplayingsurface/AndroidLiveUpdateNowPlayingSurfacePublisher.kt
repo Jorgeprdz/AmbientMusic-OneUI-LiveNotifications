@@ -12,8 +12,8 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import com.kieronquinn.app.ambientmusicmod.PACKAGE_NAME_PAM
 import com.kieronquinn.app.ambientmusicmod.R
-import com.kieronquinn.app.ambientmusicmod.ui.activities.MainActivity
 
 interface NowPlayingSurfacePublisher {
     fun publish(event: NowPlayingSurfaceEvent)
@@ -54,6 +54,18 @@ class AndroidLiveUpdateNowPlayingSurfacePublisher(
         )
     }
 
+    /**
+     * The paired Pixel Ambient Music APK exports Now Playing History using this action.
+     * It has no verified public per-track deep link, so do not invent track extras.
+     * Keep the notification destination in Pixel Ambient Music, not AMM settings.
+     */
+    fun buildHistoryIntent(): Intent {
+        return Intent("com.google.intelligence.sense.NOW_PLAYING_HISTORY").apply {
+            `package` = PACKAGE_NAME_PAM
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
+    }
+
     fun buildCandidateNotification(
         event: NowPlayingSurfaceEvent,
         requestPromotion: Boolean
@@ -61,9 +73,7 @@ class AndroidLiveUpdateNowPlayingSurfacePublisher(
         val contentIntent = PendingIntent.getActivity(
             context,
             NOTIFICATION_ID,
-            Intent(context, MainActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            },
+            buildHistoryIntent(),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         return NotificationCompat.Builder(context, CHANNEL_ID)
