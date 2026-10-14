@@ -16,6 +16,18 @@ import org.junit.runner.RunWith
 class AndroidLiveUpdateNowPlayingSurfacePublisherTest {
 
     @Test
+    fun tapOpensPairedPixelAmbientHistoryInsteadOfModSettings() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val publisher = AndroidLiveUpdateNowPlayingSurfacePublisher(context)
+        val intent = publisher.buildHistoryIntent()
+
+        assertEquals("com.google.intelligence.sense.NOW_PLAYING_HISTORY", intent.action)
+        assertEquals("com.kieronquinn.app.pixelambientmusic", intent.`package`)
+        assertNull(intent.component)
+        assertTrue((intent.flags and android.content.Intent.FLAG_ACTIVITY_NEW_TASK) != 0)
+    }
+
+    @Test
     fun candidateUsesVerifiedM0BShape() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val publisher = AndroidLiveUpdateNowPlayingSurfacePublisher(
